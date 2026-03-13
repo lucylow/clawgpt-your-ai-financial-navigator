@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Zap, Globe } from "lucide-react";
 
 export default function HeroSection() {
