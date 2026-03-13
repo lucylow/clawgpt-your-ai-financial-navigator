@@ -18,12 +18,12 @@ export default function HeroSection() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8 opacity-0 animate-fade-in-up [animation-delay:400ms]">
-          <a
-            href="#demo"
+          <Link
+            to="/app"
             className="inline-flex items-center justify-center px-8 py-3.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all shadow-lg shadow-primary/25"
           >
             Launch app
-          </a>
+          </Link>
           <a
             href="#how-it-works"
             className="inline-flex items-center justify-center px-8 py-3.5 rounded-lg border border-border text-foreground font-semibold hover:bg-secondary transition-all"
