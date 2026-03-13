@@ -29,6 +29,7 @@ const App = () => (
             <Route path="portfolio" element={<PortfolioPage />} />
             <Route path="transactions" element={<TransactionsPage />} />
             <Route path="wallets" element={<WalletsPage />} />
+            <Route path="nfts" element={<NFTsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
           </Route>
