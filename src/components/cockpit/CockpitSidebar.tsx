@@ -9,6 +9,7 @@ import {
   HelpCircle,
   LogOut,
   Wallet,
+  Image,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const navigation = [
   { name: "Portfolio", href: "/app/portfolio", icon: PieChart },
   { name: "Transactions", href: "/app/transactions", icon: History },
   { name: "Wallets", href: "/app/wallets", icon: Wallet },
+  { name: "NFTs", href: "/app/nfts", icon: Image },
   { name: "Settings", href: "/app/settings", icon: Settings },
   { name: "Help", href: "/app/help", icon: HelpCircle },
 ];
