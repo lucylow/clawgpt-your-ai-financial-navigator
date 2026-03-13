@@ -4,7 +4,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
-import CockpitPage from "./pages/CockpitPage.tsx";
+import CockpitLayout from "./layouts/CockpitLayout.tsx";
+import DashboardPage from "./pages/cockpit/DashboardPage.tsx";
+import PortfolioPage from "./pages/cockpit/PortfolioPage.tsx";
+import TransactionsPage from "./pages/cockpit/TransactionsPage.tsx";
+import WalletsPage from "./pages/cockpit/WalletsPage.tsx";
+import SettingsPage from "./pages/cockpit/SettingsPage.tsx";
+import HelpPage from "./pages/cockpit/HelpPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -17,8 +23,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/app" element={<CockpitPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/app" element={<CockpitLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="portfolio" element={<PortfolioPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="wallets" element={<WalletsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="help" element={<HelpPage />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
