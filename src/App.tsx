@@ -11,6 +11,7 @@ import TransactionsPage from "./pages/cockpit/TransactionsPage.tsx";
 import WalletsPage from "./pages/cockpit/WalletsPage.tsx";
 import SettingsPage from "./pages/cockpit/SettingsPage.tsx";
 import HelpPage from "./pages/cockpit/HelpPage.tsx";
+import NFTsPage from "./pages/cockpit/NFTsPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="portfolio" element={<PortfolioPage />} />
             <Route path="transactions" element={<TransactionsPage />} />
             <Route path="wallets" element={<WalletsPage />} />
+            <Route path="nfts" element={<NFTsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="help" element={<HelpPage />} />
           </Route>
