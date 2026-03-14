@@ -1,7 +1,8 @@
-import { useRef, useMemo } from "react";
+import { useRef, forwardRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function GlobeWireframe() {
   const groupRef = useRef<THREE.Group>(null);
@@ -52,22 +53,32 @@ function GlobeWireframe() {
   );
 }
 
+function GlobeFallback() {
+  return (
+    <div className="fixed inset-0 -z-10 bg-background flex items-center justify-center">
+      <div className="w-48 h-48 rounded-full border border-primary/20 animate-pulse" />
+    </div>
+  );
+}
+
 export default function GlobeScene() {
   return (
-    <div className="fixed inset-0 -z-10">
-      <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-        <ambientLight intensity={0.3} color="#404060" />
-        <pointLight position={[5, 5, 5]} intensity={1} />
-        <Stars radius={100} depth={50} count={2000} factor={2} saturation={0} fade speed={0.5} />
-        <GlobeWireframe />
-        <OrbitControls
-          enableZoom={false}
-          enablePan={false}
-          autoRotate
-          autoRotateSpeed={0.5}
-          enableDamping
-        />
-      </Canvas>
-    </div>
+    <ErrorBoundary fallback={<GlobeFallback />}>
+      <div className="fixed inset-0 -z-10">
+        <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+          <ambientLight intensity={0.3} color="#404060" />
+          <pointLight position={[5, 5, 5]} intensity={1} />
+          <Stars radius={100} depth={50} count={2000} factor={2} saturation={0} fade speed={0.5} />
+          <GlobeWireframe />
+          <OrbitControls
+            enableZoom={false}
+            enablePan={false}
+            autoRotate
+            autoRotateSpeed={0.5}
+            enableDamping
+          />
+        </Canvas>
+      </div>
+    </ErrorBoundary>
   );
 }

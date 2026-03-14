@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const chainNodes: { chain: string; lat: number; lon: number; color: string }[] = [
   { chain: "ethereum", lat: 51.5, lon: -0.13, color: "#627EEA" },
@@ -44,16 +45,26 @@ function Globe() {
   );
 }
 
+function GlobeFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+      <div className="w-32 h-32 rounded-full border border-primary/20 animate-pulse" />
+    </div>
+  );
+}
+
 export default function CockpitGlobe() {
   return (
-    <div className="w-full h-full min-h-[200px]">
-      <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-        <ambientLight intensity={0.3} color="#404060" />
-        <pointLight position={[5, 5, 5]} intensity={0.8} />
-        <Stars radius={80} depth={40} count={1000} factor={2} saturation={0} fade speed={0.3} />
-        <Globe />
-        <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.3} enableDamping />
-      </Canvas>
-    </div>
+    <ErrorBoundary fallback={<GlobeFallback />}>
+      <div className="w-full h-full min-h-[200px]">
+        <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+          <ambientLight intensity={0.3} color="#404060" />
+          <pointLight position={[5, 5, 5]} intensity={0.8} />
+          <Stars radius={80} depth={40} count={1000} factor={2} saturation={0} fade speed={0.3} />
+          <Globe />
+          <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.3} enableDamping />
+        </Canvas>
+      </div>
+    </ErrorBoundary>
   );
 }
