@@ -14,7 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          asset: string
+          created_at: string
+          from_chain: string
+          id: string
+          status: string
+          to_address: string | null
+          to_chain: string
+          tx_hash: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          asset?: string
+          created_at?: string
+          from_chain: string
+          id?: string
+          status?: string
+          to_address?: string | null
+          to_chain: string
+          tx_hash?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          asset?: string
+          created_at?: string
+          from_chain?: string
+          id?: string
+          status?: string
+          to_address?: string | null
+          to_chain?: string
+          tx_hash?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallets: {
+        Row: {
+          address: string
+          chain: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          label: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          chain: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          chain?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
