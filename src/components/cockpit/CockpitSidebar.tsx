@@ -27,6 +27,13 @@ const navigation = [
 export default function CockpitSidebar() {
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <aside
