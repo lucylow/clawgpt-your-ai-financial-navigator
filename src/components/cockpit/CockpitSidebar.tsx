@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
+import { useAuth } from "@/hooks/useAuth";
 import {
   LayoutDashboard,
   PieChart,
@@ -27,6 +28,13 @@ const navigation = [
 export default function CockpitSidebar() {
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <aside
@@ -82,6 +90,7 @@ export default function CockpitSidebar() {
       {/* Logout */}
       <div className="p-2 border-t border-border/30 shrink-0">
         <button
+          onClick={handleLogout}
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors w-full"
           title={sidebarOpen ? undefined : "Logout"}
         >
