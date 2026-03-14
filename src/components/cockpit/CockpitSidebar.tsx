@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 import { useAuth } from "@/hooks/useAuth";
+import {
   LayoutDashboard,
   PieChart,
   History,
