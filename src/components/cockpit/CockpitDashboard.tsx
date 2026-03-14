@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import CockpitGlobe from "./CockpitGlobe";
 import PortfolioChart from "./PortfolioChart";
@@ -7,7 +8,11 @@ import Ticker from "./Ticker";
 export default function CockpitDashboard() {
   const { totalValue, allocation } = usePortfolioStore();
 
-  const usdt = Object.values(allocation).reduce((a, b) => a + b, 0);
+  const safeTotalValue = Number.isFinite(totalValue) && totalValue >= 0 ? totalValue : 0;
+  const chainTotal = useMemo(
+    () => Object.values(allocation ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0),
+    [allocation]
+  );
 
   return (
     <div className="flex flex-col h-full p-4 gap-4 overflow-y-auto">
@@ -19,19 +24,19 @@ export default function CockpitDashboard() {
         <div className="glass-card rounded-xl p-6 flex flex-col justify-center">
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Total Portfolio</p>
           <p className="text-4xl font-bold text-foreground mb-4">
-            ${totalValue.toLocaleString()}
+            ${safeTotalValue.toLocaleString()}
           </p>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">USDt</span>
-              <span className="text-lg font-semibold text-foreground">$8,240</span>
+              <span className="text-lg font-semibold text-foreground">${Math.round(chainTotal * 0.65).toLocaleString()}</span>
             </div>
             <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
               <div className="h-full w-[65%] rounded-full bg-primary/60" />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">XAUt</span>
-              <span className="text-lg font-semibold text-foreground">$4,520</span>
+              <span className="text-lg font-semibold text-foreground">${Math.round(chainTotal * 0.35).toLocaleString()}</span>
             </div>
             <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
               <div className="h-full w-[35%] rounded-full bg-primary/40" />

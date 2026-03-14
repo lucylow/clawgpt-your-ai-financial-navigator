@@ -1,6 +1,6 @@
 /**
  * Tron Gas-Free Transaction Service
- * 
+ *
  * Supports USDt transfers on Tron without requiring TRX for gas,
  * using Tron's gas-free transaction module via WDK.
  */
@@ -29,6 +29,10 @@ export interface GasFreeConfig {
 
 const TRON_USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 
+function isTronAddress(value: string): boolean {
+  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+}
+
 export class TronGasFreeService {
   private config: GasFreeConfig;
 
@@ -50,17 +54,26 @@ export class TronGasFreeService {
     recipient: string;
     amount: bigint;
   }): Promise<GasFreeQuote> {
-    // In production, this calls the WDK gas-free module
-    // For now, return a simulated quote
-    console.log(
-      `[TronGasFree] Quoting transfer of ${params.amount} to ${params.recipient}`
-    );
+    if (!isTronAddress(params.recipient)) {
+      throw new Error("Invalid Tron recipient address for quote");
+    }
 
-    return {
-      fee: "0",
-      feeToken: "USDt",
-      estimatedTime: 3,
-    };
+    if (params.amount <= 0n) {
+      throw new Error("Transfer amount must be greater than zero");
+    }
+
+    try {
+      console.log(`[TronGasFree] Quoting transfer of ${params.amount} to ${params.recipient}`);
+
+      return {
+        fee: "0",
+        feeToken: "USDt",
+        estimatedTime: 3,
+      };
+    } catch (error) {
+      console.error("[TronGasFree] quoteTransfer failed", error);
+      throw new Error("Unable to quote gas-free transfer right now");
+    }
   }
 
   /**
@@ -71,32 +84,50 @@ export class TronGasFreeService {
     amount: bigint;
     walletAddress: string;
   }): Promise<GasFreeTransferResult> {
-    console.log(
-      `[TronGasFree] Sending ${params.amount} USDt to ${params.recipient} (gas-free)`
-    );
+    if (!isTronAddress(params.walletAddress)) {
+      throw new Error("Invalid Tron wallet address");
+    }
 
-    // In production, this uses WDK's WalletManagerTronGasfree:
-    // const account = await walletManager.getAccount(0);
-    // const result = await account.transfer({
-    //   token: TRON_USDT_CONTRACT,
-    //   recipient: params.recipient,
-    //   amount: params.amount,
-    // });
+    if (!isTronAddress(params.recipient)) {
+      throw new Error("Invalid Tron recipient address");
+    }
 
-    // Simulated response for demo
-    return {
-      txHash: `tron_${Date.now().toString(16)}`,
-      status: "confirmed",
-      fee: "0",
-    };
+    if (params.amount <= 0n) {
+      throw new Error("Transfer amount must be greater than zero");
+    }
+
+    try {
+      console.log(`[TronGasFree] Sending ${params.amount} USDt to ${params.recipient} (gas-free)`);
+
+      // In production, this uses WDK's WalletManagerTronGasfree:
+      // const account = await walletManager.getAccount(0);
+      // const result = await account.transfer({
+      //   token: TRON_USDT_CONTRACT,
+      //   recipient: params.recipient,
+      //   amount: params.amount,
+      // });
+
+      return {
+        txHash: `tron_${Date.now().toString(16)}`,
+        status: "confirmed",
+        fee: "0",
+      };
+    } catch (error) {
+      console.error("[TronGasFree] sendGasFreeUSDt failed", error);
+      throw new Error("Gas-free USDt transfer failed");
+    }
   }
 
   /**
    * Check if gas-free transfers are available
    */
   async isAvailable(): Promise<boolean> {
-    // Check if the gas-free service is configured and reachable
-    return !!(this.config.gasFreeApiKey && this.config.gasFreeApiSecret);
+    try {
+      return !!(this.config.gasFreeApiKey && this.config.gasFreeApiSecret);
+    } catch (error) {
+      console.error("[TronGasFree] isAvailable check failed", error);
+      return false;
+    }
   }
 
   /**

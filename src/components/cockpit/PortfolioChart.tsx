@@ -1,4 +1,3 @@
-import { usePortfolioStore } from "@/store/usePortfolioStore";
 import {
   AreaChart,
   Area,
@@ -19,11 +18,21 @@ const mockHistory = [
 ];
 
 export default function PortfolioChart() {
+  const safeHistory = mockHistory.filter((point) => Number.isFinite(point.value));
+
+  if (safeHistory.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-4 h-full flex items-center justify-center text-sm text-muted-foreground">
+        No chart data available.
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card rounded-xl p-4 h-full">
       <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">Portfolio Value (24h)</p>
       <ResponsiveContainer width="100%" height={140}>
-        <AreaChart data={mockHistory}>
+        <AreaChart data={safeHistory}>
           <defs>
             <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="hsl(204, 100%, 50%)" stopOpacity={0.3} />

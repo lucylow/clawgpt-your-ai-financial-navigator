@@ -1,11 +1,21 @@
-import { useRef, forwardRef } from "react";
+import { useRef, forwardRef, type ForwardedRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-function GlobeWireframe() {
-  const groupRef = useRef<THREE.Group>(null);
+function assignRef(ref: ForwardedRef<THREE.Group>, value: THREE.Group | null) {
+  if (typeof ref === "function") {
+    ref(value);
+    return;
+  }
+  if (ref) {
+    ref.current = value;
+  }
+}
+
+const GlobeWireframe = forwardRef<THREE.Group>(function GlobeWireframe(_, forwardedRef) {
+  const groupRef = useRef<THREE.Group | null>(null);
 
   useFrame(() => {
     if (groupRef.current) {
@@ -23,7 +33,12 @@ function GlobeWireframe() {
   ];
 
   return (
-    <group ref={groupRef}>
+    <group
+      ref={(node) => {
+        groupRef.current = node;
+        assignRef(forwardedRef, node);
+      }}
+    >
       <mesh>
         <sphereGeometry args={[1.5, 64, 64]} />
         <meshPhongMaterial
@@ -51,11 +66,11 @@ function GlobeWireframe() {
       ))}
     </group>
   );
-}
+});
 
 function GlobeFallback() {
   return (
-    <div className="fixed inset-0 -z-10 bg-background flex items-center justify-center">
+    <div className="fixed inset-0 -z-10 bg-background flex items-center justify-center" role="status" aria-live="polite">
       <div className="w-48 h-48 rounded-full border border-primary/20 animate-pulse" />
     </div>
   );
