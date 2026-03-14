@@ -89,6 +89,7 @@ export default function CockpitSidebar() {
       {/* Logout */}
       <div className="p-2 border-t border-border/30 shrink-0">
         <button
+          onClick={handleLogout}
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors w-full"
           title={sidebarOpen ? undefined : "Logout"}
         >
