@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, AlertCircle } from "lucide-react";
 import { sendMessageToAgent } from "@/lib/agent";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import type { Message } from "@/types";
+import { useToast } from "@/hooks/use-toast";
 
 const initialMessages: Message[] = [
   {
@@ -16,8 +17,10 @@ export default function CockpitChat() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const { updateFromAgentCommand } = usePortfolioStore();
+  const { toast } = useToast();
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -27,21 +30,47 @@ export default function CockpitChat() {
     const text = input.trim();
     if (!text || isTyping) return;
 
+    setError(null);
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
-    const response = await sendMessageToAgent(text);
-    if (response.portfolioUpdate) {
-      updateFromAgentCommand(response.portfolioUpdate);
-    }
+    try {
+      const response = await sendMessageToAgent(text);
 
-    setMessages((prev) => [
-      ...prev,
-      { id: (Date.now() + 1).toString(), role: "assistant", content: response.text },
-    ]);
-    setIsTyping(false);
+      if (response.error) {
+        toast({
+          title: "Agent Warning",
+          description: response.text,
+          variant: "destructive",
+        });
+      }
+
+      if (response.portfolioUpdate) {
+        updateFromAgentCommand(response.portfolioUpdate);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: "assistant", content: response.text },
+      ]);
+    } catch (err) {
+      console.error("[CockpitChat] Send failed:", err);
+      const errorMsg = "⚠️ Failed to reach the agent. Please try again.";
+      setError(errorMsg);
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: "assistant", content: errorMsg },
+      ]);
+      toast({
+        title: "Connection Error",
+        description: "Could not reach the AI agent.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
@@ -54,6 +83,15 @@ export default function CockpitChat() {
           <p className="text-xs text-primary">online</p>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="mx-4 mt-2 p-2 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center gap-2 text-xs text-destructive">
+          <AlertCircle size={14} />
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-auto text-xs underline">Dismiss</button>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
