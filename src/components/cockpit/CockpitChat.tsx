@@ -6,7 +6,7 @@ import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { useAuth } from "@/hooks/useAuth";
 import type { Message } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { v4 as uuidV4 } from "crypto";
+
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);

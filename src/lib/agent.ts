@@ -152,13 +152,13 @@ export async function saveChatMessage(
   content: string,
   metadata?: Record<string, unknown>
 ) {
-  const { error } = await supabase.from("chat_messages").insert({
+  const { error } = await supabase.from("chat_messages").insert([{
     user_id: userId,
     conversation_id: conversationId,
     role,
     content,
     metadata: metadata || {},
-  });
+  }] as any);
   if (error) console.error("[Agent] Failed to save message:", error);
 }
 
