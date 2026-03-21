@@ -196,13 +196,13 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
 
     usePortfolioStore.getState().appendDecisionAudit({
       kind: spend.ok ? "recommendation" : "rejection",
-      summary: spend.ok ? `Prepared send ${amount} USDt on ${chain}` : spend.reason,
+      summary: spend.ok ? `Prepared send ${amount} USDt on ${chain}` : (spend as { reason: string }).reason,
       detail: { chain, amount },
     });
 
     if (!spend.ok) {
       return {
-        text: `**Not recommended:** ${spend.reason}`,
+        text: `**Not recommended:** ${(spend as { reason: string }).reason}`,
         intent: "transfer_blocked",
       };
     }

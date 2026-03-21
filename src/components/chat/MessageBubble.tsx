@@ -132,7 +132,7 @@ export default function MessageBubble({
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => void onConfirmOpportunity?.(message.card!)}
+            onClick={() => void onConfirmOpportunity?.(message.card as Extract<ChatCardPayload, { kind: "opportunity" }>)}
           >
             {confirmOpportunityLabel}
           </Button>

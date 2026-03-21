@@ -245,8 +245,9 @@ export default function ChatInterface() {
         expectedBenefitUsd: card.policyBenefitUsd,
       });
       if (!gate.ok) {
-        toast({ variant: "destructive", title: "Not executed", description: gate.reason });
-        appendDecisionAudit({ kind: "rejection", summary: gate.reason, detail: { card } });
+        const reason = (gate as { reason: string }).reason;
+        toast({ variant: "destructive", title: "Not executed", description: reason });
+        appendDecisionAudit({ kind: "rejection", summary: reason, detail: { card } });
         appendAgentWorkflow("execute", "Aborted: policy gate");
         return;
       }

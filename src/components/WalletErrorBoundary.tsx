@@ -11,7 +11,7 @@ function WalletErrorFallback() {
 
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-2xl border border-border/40 bg-card/80 p-8 text-center shadow-inner">
-      <WalletOff className="h-16 w-16 text-muted-foreground" aria-hidden />
+      <Wallet className="h-16 w-16 text-muted-foreground" aria-hidden />
       <div className="space-y-2">
         <h3 className="text-xl font-semibold text-foreground">Wallet unavailable</h3>
         <p className="max-w-md text-sm text-muted-foreground">

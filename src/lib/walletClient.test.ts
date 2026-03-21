@@ -16,6 +16,6 @@ describe("walletClient sendTransaction", () => {
       asset: "USDt",
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe("WALLET_NOT_READY");
+    if (!r.ok) expect((r as { code: string }).code).toBe("WALLET_NOT_READY");
   });
 });

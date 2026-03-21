@@ -182,9 +182,10 @@ export function evaluateBridgeMove(input: BridgeEvaluationInput): BridgeDecision
     };
   }
 
+  const usdtRemaining = usdtOnChain(input.allocationByAsset, input.fromChain) - input.amountUsd;
   const liquidityImpact =
     input.asset === "USDt"
-      ? `Moves ${input.amountUsd.toFixed(0)} USD of liquidity from ${input.fromChain} to ${input.toChain}; leaves ~$${Math.max(0, usdtAfter).toFixed(0)} USDt on ${input.fromChain}.`
+      ? `Moves ${input.amountUsd.toFixed(0)} USD of liquidity from ${input.fromChain} to ${input.toChain}; leaves ~$${Math.max(0, usdtRemaining).toFixed(0)} USDt on ${input.fromChain}.`
       : `Moves ${input.amountUsd.toFixed(0)} USD notional of XAUt hedge exposure; not a cash substitute for spending.`;
 
   const principalRisks: string[] = [
