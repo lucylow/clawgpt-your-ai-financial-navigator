@@ -1,4 +1,4 @@
-````markdown
+
 # ClawGPT: Your AI Financial Navigator
 
 [![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=white)](https://react.dev/)
@@ -960,9 +960,4 @@ flowchart TB
     C --> L[Supabase]
     C --> M[Wallet / Web3]
     C --> N[Solidity Contracts]
-```
-
-If you’d like this README adapted into the repository’s exact existing tone, I can also reshape it into a more concise “hackathon submission” version or a more polished “production product” version.
-
-```
 ```
