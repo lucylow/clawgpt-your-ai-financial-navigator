@@ -6,7 +6,8 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    // "::" can break some hosted previews; "true" binds on all interfaces for Lovable/sandbox dev.
+    host: true,
     port: 8080,
     hmr: {
       overlay: false,
