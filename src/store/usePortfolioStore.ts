@@ -35,6 +35,10 @@ interface PortfolioState {
   setAllocation: (allocation: Record<string, number>) => void;
   setAllocationByAsset: (nested: NestedAllocation) => void;
   addTransaction: (tx: Transaction) => void;
+  /** Insert or replace by matching `tx.hash` (used for Supabase realtime tx upserts). */
+  upsertTransactionFromBackend: (tx: Transaction) => void;
+  /** Merge server snapshot JSON into totals and allocation (ignores unknown keys). */
+  mergeBackendSnapshot: (payload: unknown) => void;
   applyAgentUpdate: (update: AgentPortfolioUpdate) => void;
   /** @deprecated Prefer applyAgentUpdate — kept for agent.ts metadata */
   updateFromAgentCommand: (command: unknown) => void;
@@ -164,6 +168,40 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
       transactions: [tx, ...state.transactions].slice(0, 50),
       error: null,
     }));
+  },
+
+  upsertTransactionFromBackend: (tx) => {
+    if (!tx || !tx.hash || !tx.type) return;
+    set((state) => {
+      const idx = state.transactions.findIndex((t) => t.hash === tx.hash);
+      if (idx >= 0) {
+        const next = [...state.transactions];
+        next[idx] = tx;
+        return { transactions: next, error: null };
+      }
+      return {
+        transactions: [tx, ...state.transactions].slice(0, 50),
+        error: null,
+      };
+    });
+  },
+
+  mergeBackendSnapshot: (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    const p = payload as Record<string, unknown>;
+    try {
+      if (typeof p.totalValue === "number" && p.totalValue >= 0) {
+        get().setTotalValue(p.totalValue);
+      }
+      if (p.allocation && typeof p.allocation === "object" && !Array.isArray(p.allocation)) {
+        get().setAllocation(p.allocation as Record<string, number>);
+      }
+      if (p.allocationByAsset && typeof p.allocationByAsset === "object") {
+        get().setAllocationByAsset(p.allocationByAsset as NestedAllocation);
+      }
+    } catch (e) {
+      console.error("[PortfolioStore] mergeBackendSnapshot failed:", e);
+    }
   },
 
   applyAgentUpdate: (update) => {

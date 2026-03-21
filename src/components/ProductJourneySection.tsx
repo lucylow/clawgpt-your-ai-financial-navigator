@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   GitBranch,
 } from "lucide-react";
+import BrowseCockpitLink from "@/components/BrowseCockpitLink";
 
 const phases = [
   {
@@ -72,6 +73,13 @@ export default function ProductJourneySection() {
           <p className="mx-auto max-w-2xl text-muted-foreground md:text-lg">
             ClawGPT is built around a single journey: understand the product, authenticate, use the cockpit, and always
             review before you execute.
+          </p>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            <BrowseCockpitLink />
+            <span className="mx-2 text-muted-foreground/60" aria-hidden>
+              ·
+            </span>
+            <span>Read-only sample data; sign in or launch demo for full flows.</span>
           </p>
         </div>
 

@@ -12,10 +12,12 @@ import { useDemoStore } from "@/store/useDemoStore";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
+import { useSupabaseEventStream } from "@/hooks/useSupabaseEventStream";
 
 export default function CockpitLayout() {
   const { sidebarOpen } = useUIStore();
   useDemoModeEffects();
+  useSupabaseEventStream();
 
   useEffect(() => {
     if (!useDemoStore.getState().isDemoWalletConnected) return;

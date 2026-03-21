@@ -1,4 +1,5 @@
 import type { AgentWorkflowEntry } from "@/lib/agentWorkflow";
+import type { AgentSafetyEnvelope } from "@/lib/agentSafety";
 import type { ConfidenceScore, DecisionAuditEntry } from "@/lib/economics/types";
 
 export interface Message {
@@ -64,6 +65,8 @@ export type ChatCardPayload =
       feeEstimateUsd?: number;
       usdtAfterOnChain?: number;
       reserveNote?: string;
+      /** Approval gate, preview, validation, policy, simulation — from agent-chat or client fallback */
+      safety?: AgentSafetyEnvelope;
     }
   | {
       kind: "opportunity";

@@ -17,6 +17,7 @@ import {
   type WdkChainId,
 } from "@/config/chains";
 import { TETHER_DECIMALS } from "@/config/tetherAssets";
+import { logChainExecution } from "@/lib/observability";
 
 type EvmAccount = {
   getAddress: () => Promise<string>;
@@ -27,6 +28,17 @@ type EvmAccount = {
 function shortAddress(addr: string): string {
   if (addr.length <= 14) return addr;
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function shortHash(h: string): string {
+  if (h.length <= 18) return h;
+  return `${h.slice(0, 10)}…`;
+}
+
+function redactRecipient(addr: string): string {
+  const t = addr.trim();
+  if (t.length <= 14) return t;
+  return `${t.slice(0, 6)}…${t.slice(-4)}`;
 }
 
 function fromTetherRawUnits(n: bigint, decimals: number): number {
@@ -66,27 +78,52 @@ export class ClawWdkBridge {
   }
 
   connect(seedPhrase: string): void {
-    this.disconnect();
-    const tonCfg = getTonClientConfig();
-    this.wdk = new WDK(seedPhrase)
-      .registerWallet("ethereum", WalletManagerEvm, { provider: getEvmRpc("ethereum") })
-      .registerWallet("polygon", WalletManagerEvm, { provider: getEvmRpc("polygon") })
-      .registerWallet("arbitrum", WalletManagerEvm, { provider: getEvmRpc("arbitrum") })
-      .registerWallet("tron", WalletManagerTron, { provider: getTronRpc() })
-      .registerWallet("solana", WalletManagerSolana, {
-        rpcUrl: getSolanaRpc(),
-        commitment: "confirmed",
-      })
-      .registerWallet("ton", WalletManagerTon, { tonClient: tonCfg });
+    const t0 = performance.now();
+    logChainExecution({
+      operation: "wdk.connect",
+      phase: "start",
+      detail: { phraseLen: seedPhrase?.length ?? 0 },
+    });
+    try {
+      this.disconnect();
+      const tonCfg = getTonClientConfig();
+      this.wdk = new WDK(seedPhrase)
+        .registerWallet("ethereum", WalletManagerEvm, { provider: getEvmRpc("ethereum") })
+        .registerWallet("polygon", WalletManagerEvm, { provider: getEvmRpc("polygon") })
+        .registerWallet("arbitrum", WalletManagerEvm, { provider: getEvmRpc("arbitrum") })
+        .registerWallet("tron", WalletManagerTron, { provider: getTronRpc() })
+        .registerWallet("solana", WalletManagerSolana, {
+          rpcUrl: getSolanaRpc(),
+          commitment: "confirmed",
+        })
+        .registerWallet("ton", WalletManagerTon, { tonClient: tonCfg });
+      logChainExecution({
+        operation: "wdk.connect",
+        phase: "end",
+        durationMs: Math.round(performance.now() - t0),
+        ok: true,
+      });
+    } catch (e) {
+      logChainExecution({
+        operation: "wdk.connect",
+        phase: "end",
+        durationMs: Math.round(performance.now() - t0),
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
+    }
   }
 
   disconnect(): void {
+    logChainExecution({ operation: "wdk.disconnect", phase: "start" });
     try {
       this.wdk?.dispose();
     } catch {
       /* ignore */
     }
     this.wdk = null;
+    logChainExecution({ operation: "wdk.disconnect", phase: "end", ok: true });
   }
 
   async getPrimaryAddress(): Promise<string> {
@@ -103,7 +140,29 @@ export class ClawWdkBridge {
     nativeLabel: string;
   }> {
     if (!this.wdk) throw new Error("WDK not connected");
-    const acc = await this.wdk.getAccount(chain, 0);
+    const t0 = performance.now();
+    logChainExecution({ operation: "wdk.fetch_balances", phase: "start", chain });
+    try {
+      return await this.fetchBalancesInner(chain);
+    } finally {
+      logChainExecution({
+        operation: "wdk.fetch_balances",
+        phase: "end",
+        chain,
+        durationMs: Math.round(performance.now() - t0),
+        ok: true,
+      });
+    }
+  }
+
+  private async fetchBalancesInner(chain: WdkChainId): Promise<{
+    chain: string;
+    address: string;
+    timestamp: number;
+    balances: Record<string, number>;
+    nativeLabel: string;
+  }> {
+    const acc = await this.wdk!.getAccount(chain, 0);
     const addr = await acc.getAddress();
     const balances: Record<string, number> = {};
 
@@ -192,6 +251,8 @@ export class ClawWdkBridge {
     wallets: WalletEntry[];
   }> {
     if (!this.wdk) throw new Error("WDK not connected");
+    const t0 = performance.now();
+    logChainExecution({ operation: "wdk.portfolio_snapshot", phase: "start" });
 
     const allocation: Record<string, number> = {};
     const allocationByAsset: NestedAllocation = {};
@@ -228,8 +289,20 @@ export class ClawWdkBridge {
       }
     }
 
+    const totalValue = Math.round(total * 100) / 100;
+    logChainExecution({
+      operation: "wdk.portfolio_snapshot",
+      phase: "snapshot",
+      durationMs: Math.round(performance.now() - t0),
+      ok: true,
+      detail: {
+        totalValue,
+        chains: SUPPORTED_WDK_CHAINS.length,
+      },
+    });
+
     return {
-      totalValue: Math.round(total * 100) / 100,
+      totalValue,
       allocation,
       allocationByAsset,
       transactions: [],
@@ -245,18 +318,56 @@ export class ClawWdkBridge {
   }): Promise<{ hash: string; status: "pending" | "confirmed" }> {
     if (!this.wdk) throw new Error("WDK not connected");
     const { chain, to, amount, asset } = params;
+    const t0 = performance.now();
+    logChainExecution({
+      operation: "wdk.transfer",
+      phase: "start",
+      chain,
+      detail: { asset, to: redactRecipient(to) },
+    });
 
     if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
-      const tokens = getEvmTokenAddresses(chain);
-      const token = asset === "USDt" ? tokens.USDt : tokens.XAUt;
-      if (!token) throw new Error(`Set VITE token env for ${chain} ${asset}`);
-      const acc = (await this.wdk.getAccount(chain, 0)) as unknown as EvmAccount;
-      const amt = parseAssetAmount(amount, TETHER_DECIMALS[asset]);
-      const res = await acc.transfer({ token, recipient: to, amount: amt });
-      return { hash: res.hash, status: "pending" };
+      try {
+        const tokens = getEvmTokenAddresses(chain);
+        const token = asset === "USDt" ? tokens.USDt : tokens.XAUt;
+        if (!token) throw new Error(`Set VITE token env for ${chain} ${asset}`);
+        const acc = (await this.wdk.getAccount(chain, 0)) as unknown as EvmAccount;
+        const amt = parseAssetAmount(amount, TETHER_DECIMALS[asset]);
+        const res = await acc.transfer({ token, recipient: to, amount: amt });
+        logChainExecution({
+          operation: "wdk.transfer",
+          phase: "end",
+          chain,
+          durationMs: Math.round(performance.now() - t0),
+          ok: true,
+          detail: { hash: shortHash(res.hash), asset },
+        });
+        return { hash: res.hash, status: "pending" };
+      } catch (e) {
+        logChainExecution({
+          operation: "wdk.transfer",
+          phase: "end",
+          chain,
+          durationMs: Math.round(performance.now() - t0),
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+          detail: { asset },
+        });
+        throw e;
+      }
     }
 
-    throw new Error(`Automated ${asset} send for ${chain} is not configured in this build — use EVM testnets first.`);
+    const msg = `Automated ${asset} send for ${chain} is not configured in this build — use EVM testnets first.`;
+    logChainExecution({
+      operation: "wdk.transfer",
+      phase: "end",
+      chain,
+      durationMs: Math.round(performance.now() - t0),
+      ok: false,
+      error: msg,
+      detail: { asset },
+    });
+    throw new Error(msg);
   }
 }
 

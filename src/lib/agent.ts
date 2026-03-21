@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabaseEnvKey, supabaseEnvUrl } from "@/lib/supabaseEnv";
 import { loadConversation, saveChatMessage as persistChatMessage } from "@/services/chatMessages.service";
+import type { AgentSafetyEnvelope } from "@/lib/agentSafety";
 
 export interface AgentMetadata {
   contractContext?: Record<string, unknown>;
@@ -9,6 +10,8 @@ export interface AgentMetadata {
   portfolioPreview?: Record<string, unknown>;
   /** When true, `portfolioUpdate` may be merged into the client store (reconcile phase). */
   applyPortfolioUpdate?: boolean;
+  /** Approval gates, previews, validation, policy, and simulation — server + client defense in depth. */
+  safety?: AgentSafetyEnvelope;
 }
 
 export interface AgentResponse {
@@ -86,12 +89,13 @@ export async function streamAgentMessage({
       }
       const reply = typeof data.text === "string" ? data.text : "";
       if (reply) onDelta(reply);
-      if (data.contractContext || data.portfolioPreview || data.portfolioUpdate) {
+      if (data.contractContext || data.portfolioPreview || data.portfolioUpdate || data.safety) {
         onMetadata?.({
           contractContext: data.contractContext as Record<string, unknown> | undefined,
           portfolioPreview: data.portfolioPreview as Record<string, unknown> | undefined,
           portfolioUpdate: data.portfolioUpdate as Record<string, unknown> | undefined,
           applyPortfolioUpdate: data.applyPortfolioUpdate === true,
+          safety: data.safety as AgentSafetyEnvelope | undefined,
         });
       }
       onDone();

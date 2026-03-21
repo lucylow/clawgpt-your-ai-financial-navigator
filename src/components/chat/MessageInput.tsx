@@ -1,6 +1,12 @@
 import { Send } from "lucide-react";
 
-const CHIPS = ["Check portfolio", "Find yield", "Set up recurring buy"] as const;
+const CHIPS = [
+  "Summarize portfolio movements",
+  "Suggest rebalancing to 65% USDt",
+  "Draft a transaction plan for yield",
+  "Explain gas on Arbitrum vs Ethereum",
+  "Compare bridge routes ETH → Arbitrum",
+] as const;
 
 interface MessageInputProps {
   value: string;

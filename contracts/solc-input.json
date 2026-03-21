@@ -1,0 +1,16 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/DemoGovernor.sol": {
+      "content": ""
+    }
+  },
+  "settings": {
+    "optimizer": { "enabled": true, "runs": 200 },
+    "outputSelection": {
+      "*": {
+        "*": ["abi", "evm.bytecode"]
+      }
+    }
+  }
+}

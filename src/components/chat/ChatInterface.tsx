@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRumbleTips } from "@/hooks/useRumbleTips";
 import { Trash2, AlertCircle } from "lucide-react";
 import { assertCanApplyTransfer, evaluateUsdTSpend, totalPortfolioUsd } from "@/lib/economics/portfolioPolicy";
+import { shouldBlockExecution } from "@/lib/agentSafety";
 import { assessTransaction } from "@/lib/risk-engine";
 import { sendMessage } from "@/lib/agentClient";
 import { saveChatMessage } from "@/lib/agent";
@@ -28,7 +29,7 @@ const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! I'm **Claw**, your AI financial assistant for the **ClawGPT Cockpit**. I can surface portfolio totals, prep transactions, and walk recurring flows — all wired to the dashboard on the right.\n\nTry the chips below or ask in natural language.",
+    "Hi! I'm **Claw**, your AI financial assistant for the **ClawGPT Cockpit**. I can **summarize portfolio movements**, **suggest rebalancing**, **draft multi-step transaction plans**, **explain gas costs**, and **compare chain / bridge routes** — alongside transfers, swaps, and yield scans — wired to the dashboard on the right.\n\nTry the chips below or ask in natural language.",
 };
 
 export default function ChatInterface() {
@@ -105,6 +106,18 @@ export default function ChatInterface() {
     async (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => {
       appendAgentWorkflow("review", "User confirmed transfer card");
 
+      if (card.safety && shouldBlockExecution(card.safety)) {
+        const detail = [...card.safety.policy.violations, ...card.safety.addressValidation.errors].filter(Boolean).join(" ");
+        toast({
+          variant: "destructive",
+          title: "Blocked by safety checks",
+          description: detail || "Policy, address validation, or simulation outcome does not allow execution.",
+        });
+        appendDecisionAudit({ kind: "rejection", summary: "Safety envelope blocked send", detail: { card } });
+        appendAgentWorkflow("execute", "Aborted: safety envelope");
+        return;
+      }
+
       const st = usePortfolioStore.getState();
       const total = totalPortfolioUsd(st.allocation);
       const spend = evaluateUsdTSpend({
@@ -162,12 +175,15 @@ export default function ChatInterface() {
           });
         }
 
-        const res = await sendTransaction({
-          chain: card.chain,
-          to: recipient,
-          amount: String(card.amount),
-          asset: card.asset === "XAUt" ? "XAUt" : "USDt",
-        });
+        const res = await sendTransaction(
+          {
+            chain: card.chain,
+            to: recipient,
+            amount: String(card.amount),
+            asset: card.asset === "XAUt" ? "XAUt" : "USDt",
+          },
+          createUserConfirmedIntent(),
+        );
         if (!res.ok) {
           const errMsg = (res as { error: string }).error;
           toast({ variant: "destructive", title: "Transfer failed", description: errMsg });

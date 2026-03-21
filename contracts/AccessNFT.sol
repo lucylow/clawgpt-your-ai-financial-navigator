@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
 /**
  * @title AccessNFT
- * @dev ERC-721 membership / gate: metadata URI + optional expiry per token.
- *      Intended as an extensible hook for gated product features (cockpit, agent tools, etc.).
- *      Replace deprecated Counters with a simple counter (OpenZeppelin v5+).
+ * @dev ERC-721 membership gate with role-based minting and metadata updates.
  */
-contract AccessNFT is ERC721URIStorage, Ownable {
+contract AccessNFT is ERC721URIStorage, AccessControl {
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant METADATA_ROLE = keccak256("METADATA_ROLE");
+
     uint256 private _nextTokenId;
 
     mapping(uint256 => string) public fileTypes;
@@ -19,15 +21,21 @@ contract AccessNFT is ERC721URIStorage, Ownable {
     event NFTCreated(address indexed to, uint256 indexed tokenId, string fileType, string tokenURI);
     event NFTExpirationUpdated(uint256 indexed tokenId, uint256 expiration);
 
-    constructor() ERC721("ClawGPT Access Token", "CLAW") Ownable(msg.sender) {}
+    constructor(address admin) ERC721("ClawGPT Access Token", "CLAW") {
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(MINTER_ROLE, admin);
+        _grantRole(METADATA_ROLE, admin);
+    }
 
     function mint(
         address to,
         string calldata tokenURI_,
         string calldata fileType_,
         uint256 expiration
-    ) external onlyOwner returns (uint256) {
-        _nextTokenId++;
+    ) external onlyRole(MINTER_ROLE) returns (uint256) {
+        unchecked {
+            _nextTokenId++;
+        }
         uint256 newTokenId = _nextTokenId;
 
         _safeMint(to, newTokenId);
@@ -45,7 +53,7 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         string[] calldata tokenURIs,
         string[] calldata fileTypes_,
         uint256[] calldata expirations
-    ) external onlyOwner returns (uint256[] memory) {
+    ) external onlyRole(MINTER_ROLE) returns (uint256[] memory) {
         require(
             recipients.length == tokenURIs.length &&
                 recipients.length == fileTypes_.length &&
@@ -56,7 +64,9 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         uint256[] memory tokenIds = new uint256[](recipients.length);
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            _nextTokenId++;
+            unchecked {
+                _nextTokenId++;
+            }
             uint256 newTokenId = _nextTokenId;
             _safeMint(recipients[i], newTokenId);
             _setTokenURI(newTokenId, tokenURIs[i]);
@@ -69,14 +79,12 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         return tokenIds;
     }
 
-    /// @notice Whether the token exists and is not past its expiry (0 = no expiry).
     function isValid(uint256 tokenId) external view returns (bool) {
         require(_ownerOf(tokenId) != address(0), "Token does not exist");
         uint256 expiration = expirationTimestamps[tokenId];
         return expiration == 0 || block.timestamp < expiration;
     }
 
-    /// @notice True if `account` holds at least one non-expired token (O(supply) scan; fine for demos).
     function hasAccess(address account) external view returns (bool) {
         uint256 n = _nextTokenId;
         for (uint256 i = 1; i <= n; i++) {
@@ -87,7 +95,7 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         return false;
     }
 
-    function setExpiration(uint256 tokenId, uint256 expiration) external onlyOwner {
+    function setExpiration(uint256 tokenId, uint256 expiration) external onlyRole(METADATA_ROLE) {
         require(_ownerOf(tokenId) != address(0), "Token does not exist");
         expirationTimestamps[tokenId] = expiration;
         emit NFTExpirationUpdated(tokenId, expiration);
@@ -107,5 +115,9 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         }
 
         return tokens;
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC721) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }

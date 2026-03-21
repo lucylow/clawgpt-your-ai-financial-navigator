@@ -11,6 +11,7 @@ import { getCockpitRouteMeta } from "@/config/cockpitRoutes";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { cn } from "@/lib/utils";
+import BackendNotificationsBell from "@/components/cockpit/BackendNotificationsBell";
 
 function initialsFromUser(user: { email?: string | null; user_metadata?: { full_name?: string } } | null) {
   const name = user?.user_metadata?.full_name?.trim();
@@ -131,6 +132,7 @@ export default function CockpitHeader() {
               <RefreshCw className="h-4 w-4" />
             </Button>
           )}
+          <BackendNotificationsBell />
           <Link
             to="/app/chat"
             className={cn(

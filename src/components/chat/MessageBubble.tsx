@@ -49,6 +49,42 @@ export default function MessageBubble({
           <p className="text-foreground">
             Send {message.card.amount} {message.card.asset} on {message.card.chain} → {message.card.toLabel}
           </p>
+          {message.card.safety ? (
+            <div className="rounded-md border border-border/40 bg-secondary/20 px-2 py-2 space-y-1.5 text-[10px] text-muted-foreground">
+              <p className="font-semibold text-foreground/90 uppercase tracking-wide">Safety layers</p>
+              <p>
+                <span className="text-foreground/80">Approval gate:</span> {message.card.safety.approvalGate.reason}
+              </p>
+              <p>
+                <span className="text-foreground/80">Address:</span>{" "}
+                {message.card.safety.addressValidation.valid ? (
+                  <span className="text-emerald-400/90">Valid ({message.card.safety.addressValidation.chain})</span>
+                ) : (
+                  <span className="text-destructive/90">{message.card.safety.addressValidation.errors.join(" · ")}</span>
+                )}
+              </p>
+              <p>
+                <span className="text-foreground/80">Policy:</span>{" "}
+                {message.card.safety.policy.passed ? (
+                  <span className="text-emerald-400/90">Passed</span>
+                ) : (
+                  <span className="text-destructive/90">{message.card.safety.policy.violations.join(" · ")}</span>
+                )}
+              </p>
+              <p>
+                <span className="text-foreground/80">Simulation:</span> {message.card.safety.transactionSimulation.outcome}{" "}
+                · ~${message.card.safety.transactionSimulation.gasEstimateUsd.toFixed(2)} gas (model) —{" "}
+                {message.card.safety.transactionSimulation.summary}
+              </p>
+              {message.card.safety.actionPreview.steps.length > 0 ? (
+                <ul className="list-disc list-inside pt-0.5 text-[10px]">
+                  {message.card.safety.actionPreview.steps.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
           {message.card.feeEstimateUsd != null ? (
             <p className="text-[11px] text-muted-foreground">
               Est. gas / fees ~${message.card.feeEstimateUsd.toFixed(2)} · USDt on-chain after ~$

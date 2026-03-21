@@ -410,10 +410,180 @@ function getRouteMeta(from: string, to: string): RouteMeta {
   return ROUTE_META_BY_PAIR[chainPairKey(from, to)] ?? ROUTE_META_FALLBACK;
 }
 
+// ── Agent safety (patterns aligned with src/lib/agentSafety.ts) ──────────────
+
+const EVM_ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
+const TRON_ADDR_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const SOL_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const TON_ADDR_RE = /^(EQ|UQ)[a-zA-Z0-9_-]{40,}$/;
+
+function validateAddressForChain(chain: string, raw?: string | null) {
+  const errors: string[] = [];
+  const addr = typeof raw === "string" ? raw.trim() : "";
+  if (!addr) {
+    errors.push("Recipient address is required before execution.");
+    return { valid: false, chain, errors };
+  }
+  if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
+    if (!EVM_ADDR_RE.test(addr)) errors.push("Invalid EVM address (expect 0x + 40 hex chars).");
+    return { valid: errors.length === 0, chain, normalized: addr, errors };
+  }
+  if (chain === "solana") {
+    if (!SOL_ADDR_RE.test(addr)) errors.push("Invalid Solana address format.");
+    return { valid: errors.length === 0, chain, errors };
+  }
+  if (chain === "tron") {
+    if (!TRON_ADDR_RE.test(addr)) errors.push("Invalid Tron address (expect T + 33 base58 chars).");
+    return { valid: errors.length === 0, chain, errors };
+  }
+  if (chain === "ton") {
+    if (!TON_ADDR_RE.test(addr)) errors.push("Invalid TON address (user-friendly format).");
+    return { valid: errors.length === 0, chain, errors };
+  }
+  errors.push(`Unknown chain for validation: ${chain}`);
+  return { valid: false, chain, errors };
+}
+
+type SafetyEnvelope = {
+  approvalGate: { required: true; reason: string; surface: "transaction_card" | "wallet" };
+  actionPreview: {
+    title: string;
+    steps: string[];
+    contracts: Array<{ label: string; address: string }>;
+    amounts: Array<{ label: string; value: string }>;
+  };
+  addressValidation: { valid: boolean; chain: string; normalized?: string; errors: string[] };
+  policy: { passed: boolean; violations: string[]; guardrailSummary: string[] };
+  transactionSimulation: {
+    outcome: "ok" | "would_revert" | "unknown";
+    gasEstimateUsd: number;
+    summary: string;
+    method: "heuristic_model";
+  };
+};
+
+function safetyForTransfer(
+  args: Record<string, any>,
+  config: (typeof CHAIN_CONFIGS)[string],
+  risk: ReturnType<typeof riskAssessment>,
+  tokenContract: string,
+): SafetyEnvelope {
+  const addr = validateAddressForChain(String(args.chain), args.to_address);
+  const violations: string[] = [];
+  if (!addr.valid) violations.push(...addr.errors);
+  if (risk.level === "BLOCKED") violations.push(...risk.reasons);
+  const gasUsd = config.gasAvgUsd ?? 2;
+  const simOk = addr.valid && risk.level !== "BLOCKED";
+  return {
+    approvalGate: {
+      required: true,
+      reason: "On-chain transfer requires explicit user approval and wallet signature.",
+      surface: "transaction_card",
+    },
+    actionPreview: {
+      title: "Token transfer",
+      steps: [
+        "Validate recipient and chain",
+        "Simulate ERC-20 transfer (balance + allowance)",
+        "Submit only after explicit confirmation",
+      ],
+      contracts: tokenContract ? [{ label: "Token", address: tokenContract }] : [],
+      amounts: [{ label: "Send", value: `${args.amount} ${args.asset}` }],
+    },
+    addressValidation: addr,
+    policy: {
+      passed: violations.length === 0,
+      violations,
+      guardrailSummary: [
+        `Max single tx ${GUARDRAILS.maxSingleTxPct}% of portfolio · Max daily ${GUARDRAILS.maxDailySpendPct}%`,
+        `Gas < ${GUARDRAILS.maxGasToAmountRatio * 100}% of amount`,
+      ],
+    },
+    transactionSimulation: {
+      outcome: simOk ? "ok" : "unknown",
+      gasEstimateUsd: gasUsd,
+      summary: simOk
+        ? "Heuristic: transfer calldata encodes ERC-20 transfer; use RPC eth_call / simulate for production."
+        : "Simulation skipped — fix address or policy first.",
+      method: "heuristic_model",
+    },
+  };
+}
+
+function safetyForSwap(args: Record<string, any>, config: (typeof CHAIN_CONFIGS)[string], risk: ReturnType<typeof riskAssessment>): SafetyEnvelope {
+  const uniswap = config.protocols?.uniswap;
+  const violations: string[] = [];
+  if (risk.level === "BLOCKED") violations.push(...risk.reasons);
+  const gasUsd = (config.gasAvgUsd ?? 1) * 2;
+  return {
+    approvalGate: {
+      required: true,
+      reason: "Swaps require explicit confirmation; slippage and MEV risk apply.",
+      surface: "transaction_card",
+    },
+    actionPreview: {
+      title: "DEX swap",
+      steps: ["Approve router if needed", "Simulate swap route", "Confirm swap"],
+      contracts: uniswap ? [{ label: "Uniswap router", address: uniswap.router }] : [],
+      amounts: [{ label: "In", value: `${args.amount} ${args.from_asset} → ${args.to_asset}` }],
+    },
+    addressValidation: { valid: true, chain: String(args.chain), errors: [] },
+    policy: {
+      passed: violations.length === 0,
+      violations,
+      guardrailSummary: [`Max slippage ${GUARDRAILS.maxSlippageBps} bps`, `Protocols: ${GUARDRAILS.whitelistedProtocols.join(", ")}`],
+    },
+    transactionSimulation: {
+      outcome: violations.length === 0 ? "ok" : "unknown",
+      gasEstimateUsd: gasUsd,
+      summary: "Heuristic swap simulation — production should quote route and simulate via RPC.",
+      method: "heuristic_model",
+    },
+  };
+}
+
+function safetyForAave(
+  args: Record<string, any>,
+  config: (typeof CHAIN_CONFIGS)[string],
+  op: "deposit" | "withdraw",
+  risk: ReturnType<typeof riskAssessment>,
+): SafetyEnvelope {
+  const pool = config.protocols?.aave?.lendingPool;
+  const violations: string[] = [];
+  if (risk.level === "BLOCKED") violations.push(...risk.reasons);
+  const gasUsd = (config.gasAvgUsd ?? 1) * 2.5;
+  return {
+    approvalGate: {
+      required: true,
+      reason: "Lending actions require explicit confirmation (smart contract risk).",
+      surface: "transaction_card",
+    },
+    actionPreview: {
+      title: op === "deposit" ? "Aave deposit" : "Aave withdraw",
+      steps: op === "deposit" ? ["Approve token", "Simulate deposit", "Confirm"] : ["Simulate withdraw", "Confirm"],
+      contracts: pool ? [{ label: "Aave pool", address: pool }] : [],
+      amounts: [{ label: "Notional", value: `${args.amount} ${args.asset}` }],
+    },
+    addressValidation: { valid: true, chain: String(args.chain), errors: [] },
+    policy: {
+      passed: violations.length === 0,
+      violations,
+      guardrailSummary: [`Max single tx ${GUARDRAILS.maxSingleTxPct}% of portfolio`, `Protocols: ${GUARDRAILS.whitelistedProtocols.join(", ")}`],
+    },
+    transactionSimulation: {
+      outcome: violations.length === 0 ? "ok" : "unknown",
+      gasEstimateUsd: gasUsd,
+      summary: "Heuristic lending simulation — production should use pool contract eth_call.",
+      method: "heuristic_model",
+    },
+  };
+}
+
 function executeTool(name: string, args: Record<string, any>): {
   text: string;
   contractContext?: Record<string, any>;
   portfolioPreview?: Record<string, any>;
+  safety?: SafetyEnvelope;
 } {
   switch (name) {
     case "risk_check": {
@@ -474,13 +644,28 @@ function executeTool(name: string, args: Record<string, any>): {
       const tokenContract = config.tokens[args.asset as keyof typeof config.tokens];
       if (!tokenContract) return { text: `Token ${String(args.asset)} is not configured on ${config.name}.` };
       const risk = riskAssessment(args.amount, getPortfolioTotal(), config.gasAvgUsd);
-      if (risk.level === "BLOCKED") return { text: `🚫 **Transfer blocked:** ${risk.reasons.join("; ")}` };
+      const safety = safetyForTransfer(args, config, risk, tokenContract);
+      if (risk.level === "BLOCKED") {
+        return {
+          text: `🚫 **Transfer blocked:** ${risk.reasons.join("; ")}`,
+          safety,
+        };
+      }
       const riskBadge = risk.level === "HIGH" ? "⚠️ HIGH RISK" : risk.level === "MEDIUM" ? "🟡 MEDIUM" : "✅ LOW";
       const addr = args.to_address ? `${args.to_address.slice(0, 6)}…${args.to_address.slice(-4)}` : "pending";
       return {
         text: `📤 **Transfer prepared** [${riskBadge}]\n\n• **Amount:** ${args.amount} ${args.asset}\n• **To:** ${addr}\n• **Chain:** ${config.name} (ID ${config.chainId})\n• **Token contract:** \`${tokenContract}\`\n• **Est. gas:** ~$${config.gasAvgUsd.toFixed(2)}\n\nConfirm in your wallet to proceed.`,
-        contractContext: { action: "erc20_transfer", tokenContract, chain: args.chain, chainId: config.chainId, to: args.to_address, amount: args.amount },
+        contractContext: {
+          action: "erc20_transfer",
+          tokenContract,
+          chain: args.chain,
+          chainId: config.chainId,
+          to: args.to_address,
+          amount: args.amount,
+          asset: args.asset,
+        },
         portfolioPreview: { type: "transfer", fromChain: args.chain, toChain: args.chain, amount: args.amount },
+        safety,
       };
     }
 
@@ -489,9 +674,12 @@ function executeTool(name: string, args: Record<string, any>): {
       if (!config?.protocols?.uniswap || !config.tokens) return { text: `Swaps not available on ${String(args.chain)}.` };
       const uniswap = config.protocols.uniswap;
       const slipBps = 15 + Math.round(args.amount / 500);
+      const risk = riskAssessment(args.amount, getPortfolioTotal(), config.gasAvgUsd * 2);
+      const safety = safetyForSwap(args, config, risk);
       return {
         text: `🔄 **Swap prepared**\n\n• **From:** ${args.amount} ${args.from_asset} → ${args.to_asset}\n• **Chain:** ${config.name}\n• **Router:** \`${uniswap.router}\`\n• **Est. slippage:** ~${slipBps} bps (${(slipBps / 100).toFixed(2)}%)\n• **Est. gas:** ~$${(config.gasAvgUsd * 2).toFixed(2)}\n\nConfirm to execute.`,
         contractContext: { action: "uniswap_exact_input_single", router: uniswap.router, tokenIn: config.tokens[args.from_asset], tokenOut: config.tokens[args.to_asset], chain: args.chain, chainId: config.chainId, amount: args.amount, maxSlippageBps: Math.min(slipBps * 2, GUARDRAILS.maxSlippageBps) },
+        safety,
       };
     }
 
@@ -512,18 +700,24 @@ function executeTool(name: string, args: Record<string, any>): {
       const config = CHAIN_CONFIGS[args.chain];
       if (!config?.protocols?.aave) return { text: `Aave not available on ${String(args.chain)}.` };
       const aave = config.protocols.aave;
+      const risk = riskAssessment(args.amount, getPortfolioTotal(), config.gasAvgUsd * 2.5);
+      const safety = safetyForAave(args, config, "deposit", risk);
       return {
         text: `🏦 **Aave Deposit prepared**\n\n• **Asset:** ${args.asset} · **Amount:** ${args.amount}\n• **Chain:** ${config.name}\n• **Lending Pool:** \`${aave.lendingPool}\`\n• **Current APY:** ~${aave.avgApy}%\n• **Projected annual:** ~$${((args.amount * aave.avgApy) / 100).toFixed(2)}\n\nTwo transactions: Approve → Deposit.`,
         contractContext: { action: "aave_deposit", lendingPool: aave.lendingPool, tokenContract: config.tokens[args.asset], chain: args.chain, chainId: config.chainId, amount: args.amount },
+        safety,
       };
     }
 
     case "aave_withdraw": {
       const config = CHAIN_CONFIGS[args.chain];
       if (!config?.protocols?.aave) return { text: `Aave not available on ${String(args.chain)}.` };
+      const risk = riskAssessment(args.amount, getPortfolioTotal(), config.gasAvgUsd * 2.5);
+      const safety = safetyForAave(args, config, "withdraw", risk);
       return {
         text: `🏦 **Aave Withdrawal prepared**\n\n• **Asset:** ${args.asset} · **Amount:** ${args.amount}\n• **Chain:** ${config.name}\n• **Lending Pool:** \`${config.protocols.aave.lendingPool}\`\n\nConfirm to withdraw.`,
         contractContext: { action: "aave_withdraw", lendingPool: config.protocols.aave.lendingPool, tokenContract: config.tokens[args.asset], chain: args.chain, chainId: config.chainId, amount: args.amount },
+        safety,
       };
     }
 
@@ -559,6 +753,222 @@ function executeTool(name: string, args: Record<string, any>): {
       return { text: lines.join("\n") };
     }
 
+    case "summarize_portfolio_movements": {
+      const days = Math.min(90, Math.max(1, Number(args.period_days) || 7));
+      const focus = (args.focus as string) === "usd_t" || (args.focus as string) === "xaut" ? args.focus : "all";
+      const rows: string[] = [];
+      let dUsdT = 0;
+      let dXAUt = 0;
+      for (const chain of Object.keys(DEMO_PORTFOLIO)) {
+        const cur = DEMO_PORTFOLIO[chain];
+        const prev = PORTFOLIO_7D_AGO[chain] ?? { USDt: cur.USDt, XAUt: cur.XAUt };
+        const u = cur.USDt - prev.USDt;
+        const x = cur.XAUt - prev.XAUt;
+        dUsdT += u;
+        dXAUt += x;
+        if (focus === "all" || (focus === "usd_t" && u !== 0) || (focus === "xaut" && x !== 0)) {
+          rows.push(
+            `| ${CHAIN_CONFIGS[chain]?.name ?? chain} | ${u >= 0 ? "+" : ""}$${u.toLocaleString()} USDt | ${x >= 0 ? "+" : ""}$${x.toLocaleString()} XAUt |`,
+          );
+        }
+      }
+      const nav = getPortfolioTotal();
+      const usdtNav = Object.values(DEMO_PORTFOLIO).reduce((s, v) => s + v.USDt, 0);
+      const xautNav = Object.values(DEMO_PORTFOLIO).reduce((s, v) => s + v.XAUt, 0);
+      const usdtPct = nav > 0 ? (usdtNav / nav) * 100 : 0;
+      const xautPct = nav > 0 ? (xautNav / nav) * 100 : 0;
+      const lines = [
+        `📉 **Portfolio movements (last ~${days} days, demo model)**`,
+        "",
+        "**Per-chain delta vs prior snapshot** (USDt / XAUt notional)",
+        "",
+        "| Chain | Δ USDt | Δ XAUt |",
+        "|-------|--------|--------|",
+        ...rows,
+        "",
+        `**Net flows:** ${dUsdT >= 0 ? "+" : ""}$${dUsdT.toLocaleString()} USDt · ${dXAUt >= 0 ? "+" : ""}$${dXAUt.toLocaleString()} XAUt`,
+        `**Current sleeve mix:** ~${usdtPct.toFixed(1)}% USDt (liquidity) · ~${xautPct.toFixed(1)}% XAUt (hedge)`,
+        "",
+        "*Figures are illustrative and tied to the cockpit demo store; connect WDK for live history.*",
+      ];
+      return { text: lines.join("\n") };
+    }
+
+    case "suggest_rebalancing": {
+      const nav = getPortfolioTotal();
+      const usdtNav = Object.values(DEMO_PORTFOLIO).reduce((s, v) => s + v.USDt, 0);
+      const xautNav = Object.values(DEMO_PORTFOLIO).reduce((s, v) => s + v.XAUt, 0);
+      const target = Math.min(92, Math.max(GUARDRAILS.minReserveUsdT * 100, Number(args.target_usdt_pct) || 65));
+      const currentUsdTPct = nav > 0 ? (usdtNav / nav) * 100 : 0;
+      const gapPct = target - currentUsdTPct;
+      const usdToShift = (Math.abs(gapPct) / 100) * nav;
+      const lines = [
+        "⚖️ **Rebalancing suggestion (policy-aware)**",
+        "",
+        `• **Target:** ~${target}% NAV in **USDt** (liquidity) · ~${(100 - target).toFixed(0)}% **XAUt** (hedge)`,
+        `• **Current:** ~${currentUsdTPct.toFixed(1)}% USDt · ~${(100 - currentUsdTPct).toFixed(1)}% XAUt`,
+        "",
+      ];
+      if (Math.abs(gapPct) < 1.5) {
+        lines.push("**Verdict:** Drift is small — **no trade required** unless you have a cash-flow or risk mandate change.");
+        return { text: lines.join("\n") };
+      }
+      if (gapPct > 0) {
+        lines.push(
+          `**Direction:** Raise USDt by ~$${usdToShift.toFixed(0)} notional (reduce gold sleeve toward target).`,
+          "",
+          "**Candidate actions (execute only what fits your mandate):**",
+          `1. Swap **~$${Math.min(usdToShift, xautNav * 0.5).toFixed(0)} XAUt → USDt** on an AMM-enabled chain (check slippage).`,
+          "2. If new capital is incoming, **prefer USDt** over XAUt until the sleeve aligns.",
+          `3. Run **risk_check** before any swap ≥ ${GUARDRAILS.maxDailySpendPct}% NAV/day.`,
+        );
+      } else {
+        lines.push(
+          `**Direction:** Raise XAUt (hedge) by ~$${usdToShift.toFixed(0)} notional vs USDt.`,
+          "",
+          "**Candidate actions:**",
+          `1. Swap **USDt → XAUt** on Polygon or Arbitrum for lower **gas vs notional** than mainnet.`,
+          "2. Keep **≥ " + (GUARDRAILS.minReserveUsdT * 100).toFixed(0) + "%** USDt as operational reserve.",
+          "3. Treat XAUt as **hedge**, not spending money — avoid bridging it for routine gas.",
+        );
+      }
+      lines.push("", "*This is not investment advice; confirm fees and contracts in the UI.*");
+      return { text: lines.join("\n") };
+    }
+
+    case "draft_transaction_plan": {
+      const goal = String(args.goal ?? "consolidate_to_l2");
+      const amount = Number(args.amount_usd) > 0 ? Number(args.amount_usd) : 500;
+      const asset = (args.asset as string) === "XAUt" ? "XAUt" : "USDt";
+      const chain = typeof args.primary_chain === "string" && CHAIN_CONFIGS[args.primary_chain]
+        ? args.primary_chain
+        : "arbitrum";
+      const cfg = CHAIN_CONFIGS[chain];
+      const gas1 = cfg.gasAvgUsd;
+      const gas2 = cfg.gasAvgUsd * 2;
+
+      const steps: string[] = [];
+      if (goal === "consolidate_to_l2") {
+        steps.push(
+          `1. **Approve** ${asset} on **Ethereum** (if moving from L1) — est gas ~$${CHAIN_CONFIGS.ethereum.gasAvgUsd.toFixed(2)}`,
+          `2. **Bridge** ~${amount} ${asset} **Ethereum → ${CHAIN_CONFIGS[chain].name}** — L1 + relay (see compare_chain_routes)`,
+          `3. **Verify** balance on ${CHAIN_CONFIGS[chain].name} in Cockpit; reconcile allocation`,
+        );
+      } else if (goal === "increase_yield") {
+        const apy = cfg.protocols?.aave?.avgApy ?? 4;
+        steps.push(
+          `1. **Approve** ${asset} for Aave on **${cfg.name}** — est ~$${gas1.toFixed(2)}`,
+          `2. **Deposit** ~${amount} ${asset} to Aave — second tx ~$${gas2.toFixed(2)}; modeled APY ~${apy}%`,
+          `3. **Monitor** health factor / rate changes; plan exit liquidity before large spends`,
+        );
+      } else if (goal === "raise_hedge") {
+        steps.push(
+          `1. **Swap** USDt → XAUt on **${cfg.name}** (Uniswap path) — est gas ~$${gas2.toFixed(2)}`,
+          `2. **Optional:** move hedge to custody policy; XAUt is **not** for routine gas`,
+          `3. **Record** sleeve target vs actual in portfolio view`,
+        );
+      } else {
+        steps.push(
+          `1. **Approve** ${asset} on source chain — ~$${gas1.toFixed(2)}`,
+          `2. **Bridge** ${amount} ${asset} per chosen route (compare_chain_routes)`,
+          `3. **Confirm** destination + run risk_check on the notional`,
+        );
+      }
+
+      const planText = [
+        "📋 **Draft transaction plan** *(review before signing)*",
+        "",
+        `**Goal:** ${goal.replace(/_/g, " ")} · **Notional:** ~$${amount} ${asset}`,
+        "",
+        ...steps,
+        "",
+        "**Guardrails:** Single tx < " + GUARDRAILS.maxSingleTxPct + "% NAV · gas < " + GUARDRAILS.maxGasToAmountRatio * 100 + "% of amount · whitelist protocols only.",
+      ].join("\n");
+      return {
+        text: planText,
+        portfolioPreview: { type: "plan_draft", goal, amount, asset, chain },
+      };
+    }
+
+    case "explain_gas_costs": {
+      const cfg = CHAIN_CONFIGS[args.chain];
+      if (!cfg) return { text: `Unknown chain: ${String(args.chain)}.` };
+      const op = String(args.operation ?? "transfer");
+      const mult = op === "swap" ? 2 : op === "deposit" ? 2.5 : op === "bridge" ? 2.2 : 1;
+      const est = cfg.gasAvgUsd * mult;
+      const amt = Number(args.amount_usd);
+      const ratio =
+        Number.isFinite(amt) && amt > 0 ? ((est / amt) * 100).toFixed(2) : null;
+      const l2 = ["polygon", "arbitrum", "solana", "tron", "ton"].includes(String(args.chain));
+      const lines = [
+        "⛽ **Gas cost explainer**",
+        "",
+        `**Chain:** ${cfg.name} · **Operation class:** ${op}`,
+        `**Model estimate:** ~$${est.toFixed(2)} *(avg base × complexity multiplier ${mult}×; not a live quote)*`,
+        "",
+        "**What you are paying for**",
+        "• **Network fee** — compensates validators for including your transaction.",
+        op !== "transfer"
+          ? "• **Extra calldata / router logic** — swaps, bridges, and deposits run more contract code than a simple send."
+          : "• **Simple ERC-20 transfer** — typically one of the cheapest paths.",
+        l2
+          ? "• **L2 / alt L1** — batching and lower congestion often make **fees tiny vs mainnet Ethereum**."
+          : "• **Ethereum L1** — block space is scarce; fees spike when demand is high.",
+        "",
+        ratio !== null
+          ? `**Vs your notional (~$${amt.toLocaleString()}):** gas is **~${ratio}%** of size — ${Number(ratio) > GUARDRAILS.maxGasToAmountRatio * 100 ? "⚠️ high relative to amount; batch or wait" : "reasonable for many use cases"}.`
+          : "**Tip:** Compare `get_gas_comparison` across chains for the same operation class.",
+        "",
+        "*Live execution uses wallet simulation / RPC quotes — use those before submitting.*",
+      ];
+      return { text: lines.filter(Boolean).join("\n") };
+    }
+
+    case "compare_chain_routes": {
+      const from = CHAIN_CONFIGS[args.from_chain];
+      const to = CHAIN_CONFIGS[args.to_chain];
+      if (!from || !to) return { text: `Unknown route: ${String(args.from_chain)} → ${String(args.to_chain)}.` };
+      if (args.from_chain === args.to_chain) {
+        return { text: "Same source and destination chain — **no bridge**. Use **transfer** or **swap** on that network." };
+      }
+      const asset = args.asset === "XAUt" ? "XAUt" : "USDt";
+      const amount = Number(args.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return { text: "Provide a positive **amount** to compare routes." };
+
+      const meta = getRouteMeta(args.from_chain, args.to_chain);
+      const baseCost = from.gasAvgUsd + to.gasAvgUsd + meta.relayUsd;
+      const risk = riskAssessment(amount, getPortfolioTotal(), baseCost);
+      const viaPolygonExtra = String(args.from_chain) === "ethereum" && String(args.to_chain) === "arbitrum";
+
+      const rows: string[] = [
+        "| Route | Est. total (gas+relay demo) | ETA (indicative) | Hops | Notes |",
+        "|-------|-----------------------------|------------------|------|-------|",
+        `| **Direct:** ${from.name} → ${to.name} | ~$${baseCost.toFixed(2)} | ${meta.etaHours} | ${meta.hops} | ${meta.notes} |`,
+      ];
+
+      if (viaPolygonExtra) {
+        const alt = from.gasAvgUsd + CHAIN_CONFIGS.polygon.gasAvgUsd * 2 + to.gasAvgUsd + 2.5;
+        rows.push(
+          `| **Via Polygon hub** (ETH→MATIC→ARB illustrative) | ~$${alt.toFixed(2)} | often slower, extra trust surface | 3+ | Compare UI quotes; not always cheaper after liquidity fees |`,
+        );
+      }
+
+      const out = [
+        "🛤️ **Chain route comparison** *(demo estimates — verify in product)*",
+        "",
+        `**Move:** ${amount.toLocaleString()} **${asset}** · **${from.name}** → **${to.name}**`,
+        `**Risk snapshot:** ${risk.level} — ${risk.reasons[0]}`,
+        "",
+        ...rows,
+        "",
+        "**How to read this:** Lower **$** is better for fees, but **hops** and **bridge UI** add smart-contract and timing risk. Prefer **canonical** or **widely audited** bridges for large size.",
+      ].join("\n");
+      return {
+        text: out,
+        portfolioPreview: { type: "route_compare", fromChain: args.from_chain, toChain: args.to_chain, amount, asset },
+      };
+    }
+
     default:
       return { text: `Unknown tool: ${name}` };
   }
@@ -580,6 +990,13 @@ const SYSTEM_PROMPT = `You are **Claw**, an autonomous AI financial copilot for 
 - **Max slippage:** ${GUARDRAILS.maxSlippageBps} bps (1%)
 - **Protocol whitelist:** Only ${GUARDRAILS.whitelistedProtocols.join(", ")} — reject unknown protocols
 
+## Execution safety (mandatory for agentic on-chain steps)
+- **Approval gates:** Never imply a transaction is signed without explicit user + wallet confirmation
+- **Action previews:** Surface steps, contract addresses, and amounts before execution
+- **Address validation:** Validate recipients per chain (EVM 0x-hex, Solana/Tron/TON formats)
+- **Policy checks:** Enforce NAV %, gas-vs-amount, and protocol allowlists (tool outputs include structured results)
+- **Transaction simulation:** Heuristic in this environment; production should use RPC \`eth_call\` / wallet simulation before broadcast
+
 ## Decision Framework (OpenClaw RL)
 For EVERY recommendation:
 1. **Run risk_check** before any transfer, swap, or bridge
@@ -593,6 +1010,15 @@ For EVERY recommendation:
 - When you see idle funds > $100 USDt, proactively suggest yield via scan_yield_opportunities
 - When a cheaper chain exists for the user's pattern, suggest migration with cost comparison
 - Monitor gas prices and suggest batching during high-fee periods
+
+## Assistant workflows (use tools — do not invent precise numbers)
+| User intent | Tool(s) |
+|-------------|---------|
+| Summarize recent activity, flows, "what moved", P&L-style movement | **summarize_portfolio_movements** (optionally focus=usd_t or xaut) |
+| Rebalance sleeves, fix USDt/XAUt drift, target allocation | **suggest_rebalancing** (target_usdt_pct) then **risk_check** on any proposed trade size |
+| Multi-step execution, checklist, staged tx plan | **draft_transaction_plan** |
+| Why is gas high, L2 vs L1, gas vs trade size | **explain_gas_costs**; for cross-chain fee tables also **get_gas_comparison** |
+| Which bridge path is cheaper/faster, chain A vs B for a move | **compare_chain_routes** (and **bridge_tokens** only when preparing a specific execution) |
 
 ## Interaction Style
 - Concise, professional, markdown-formatted
@@ -666,7 +1092,7 @@ Deno.serve(async (req: Request) => {
     // If the model wants to call tools
     if (choice?.finish_reason === "tool_calls" || choice?.message?.tool_calls?.length) {
       const toolCalls = choice.message.tool_calls;
-      const toolResults: Array<{ text: string; contractContext?: any; portfolioPreview?: any }> = [];
+      const toolResults: Array<{ text: string; contractContext?: any; portfolioPreview?: any; safety?: SafetyEnvelope }> = [];
 
       for (const tc of toolCalls) {
         try {
@@ -712,18 +1138,20 @@ Deno.serve(async (req: Request) => {
           text: combined,
           contractContext: toolResults.find(r => r.contractContext)?.contractContext,
           portfolioPreview: toolResults.find(r => r.portfolioPreview)?.portfolioPreview,
+          safety: toolResults.find(r => r.safety)?.safety,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const metadata = {
         contractContext: toolResults.find(r => r.contractContext)?.contractContext,
         portfolioPreview: toolResults.find(r => r.portfolioPreview)?.portfolioPreview,
+        safety: toolResults.find(r => r.safety)?.safety,
       };
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
-          if (metadata.contractContext || metadata.portfolioPreview) {
+          if (metadata.contractContext || metadata.portfolioPreview || metadata.safety) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ metadata })}\n\n`));
           }
           const reader = followUp.body!.getReader();

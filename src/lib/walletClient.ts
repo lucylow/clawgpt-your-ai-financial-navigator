@@ -12,6 +12,7 @@ import type { UserConfirmedChainIntent } from "@/lib/securityModel";
 import { getQueryClient } from "@/lib/queryClientSingleton";
 import { queryKeys } from "@/lib/queryKeys";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
+import { logChainExecution } from "@/lib/observability";
 
 type WdkModule = typeof import("@/lib/wdkClient");
 
@@ -97,6 +98,8 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
   if (import.meta.env.VITE_USE_WDK === "false") {
     return { success: false, error: "WDK disabled (VITE_USE_WDK=false)" };
   }
+  const t0 = performance.now();
+  logChainExecution({ operation: "wallet.session_connect", phase: "start" });
   try {
     const [{ clawWdk }, { default: WDK }] = await Promise.all([loadWdkModule(), import("@tetherto/wdk")]);
     const phrase =
@@ -132,13 +135,29 @@ export async function refreshLivePortfolio(): Promise<void> {
   if (readWalletMode() !== "wdk") return;
   const { clawWdk } = await loadWdkModule();
   if (!clawWdk.isReady()) return;
+  const t0 = performance.now();
+  logChainExecution({ operation: "wallet.refresh_portfolio", phase: "start" });
   try {
     const snap = await clawWdk.buildPortfolioSnapshot();
     usePortfolioStore.getState().hydrateDemoPortfolio(snap);
     usePortfolioStore.getState().setPortfolioSyncError(null);
     getQueryClient()?.invalidateQueries({ queryKey: queryKeys.portfolio.all });
+    logChainExecution({
+      operation: "wallet.refresh_portfolio",
+      phase: "end",
+      durationMs: Math.round(performance.now() - t0),
+      ok: true,
+      detail: { totalValue: snap.totalValue },
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Portfolio sync failed";
+    logChainExecution({
+      operation: "wallet.refresh_portfolio",
+      phase: "end",
+      durationMs: Math.round(performance.now() - t0),
+      ok: false,
+      error: msg,
+    });
     usePortfolioStore.getState().setPortfolioSyncError(msg);
     throw new Error(msg);
   }
@@ -186,20 +205,73 @@ export type SendTransactionResult =
       code: "WALLET_NOT_READY" | "VALIDATION" | "CHAIN_UNSUPPORTED" | "EXECUTION";
     };
 
-export async function sendTransaction(params: SendTransactionParams): Promise<SendTransactionResult> {
+export async function sendTransaction(
+  params: SendTransactionParams,
+  intent: UserConfirmedChainIntent,
+): Promise<SendTransactionResult> {
+  if (
+    intent.kind !== "user_confirmed" ||
+    typeof intent.confirmedAtMs !== "number" ||
+    !Number.isFinite(intent.confirmedAtMs)
+  ) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      ok: false,
+      error: "missing_user_intent",
+      detail: { code: "VALIDATION" },
+    });
+    return {
+      ok: false,
+      error: "On-chain sends require an explicit user confirmation intent.",
+      code: "VALIDATION",
+    };
+  }
   if (!(SUPPORTED_WDK_CHAINS as readonly string[]).includes(params.chain)) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain: params.chain,
+      ok: false,
+      error: "unsupported_chain",
+      detail: { code: "VALIDATION" },
+    });
     return { ok: false, error: `Unsupported chain: ${params.chain}`, code: "VALIDATION" };
   }
   const chain = params.chain as WdkChainId;
   if (!params.to?.trim()) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: false,
+      error: "missing_recipient",
+      detail: { code: "VALIDATION" },
+    });
     return { ok: false, error: "Recipient address is required.", code: "VALIDATION" };
   }
   const amt = Number.parseFloat(params.amount);
   if (!Number.isFinite(amt) || amt <= 0) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: false,
+      error: "invalid_amount",
+      detail: { code: "VALIDATION" },
+    });
     return { ok: false, error: "Invalid amount.", code: "VALIDATION" };
   }
   const { clawWdk } = await loadWdkModule();
   if (!clawWdk.isReady()) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: false,
+      error: "wallet_not_ready",
+      detail: { code: "WALLET_NOT_READY" },
+    });
     return {
       ok: false,
       error: "Wallet not connected. Connect WDK from the cockpit wallet control.",
@@ -207,12 +279,26 @@ export async function sendTransaction(params: SendTransactionParams): Promise<Se
     };
   }
   if (chain !== "ethereum" && chain !== "polygon" && chain !== "arbitrum") {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: false,
+      error: "chain_unsupported",
+      detail: { code: "CHAIN_UNSUPPORTED" },
+    });
     return {
       ok: false,
       error: `On-chain ${params.asset} transfer for ${chain} is not wired in this build (EVM testnets only).`,
       code: "CHAIN_UNSUPPORTED",
     };
   }
+  logChainExecution({
+    operation: "wallet.send_transaction",
+    phase: "start",
+    chain,
+    detail: { asset: params.asset },
+  });
   try {
     const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
     const r = await clawWdk.sendTetherTransfer({
@@ -221,8 +307,23 @@ export async function sendTransaction(params: SendTransactionParams): Promise<Se
       amount: params.amount,
       asset,
     });
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: true,
+      detail: { hash: r.hash.length > 14 ? `${r.hash.slice(0, 10)}…` : r.hash },
+    });
     return { ok: true, hash: r.hash, status: r.status };
   } catch (e) {
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "end",
+      chain,
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      detail: { code: "EXECUTION" },
+    });
     return {
       ok: false,
       error: e instanceof Error ? e.message : String(e),

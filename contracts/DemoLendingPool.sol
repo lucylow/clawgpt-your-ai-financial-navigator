@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title DemoLendingPool
- * @dev Minimal USDT-style pool: deposits, simple time-based yield, owner-mediated loans with repayment.
- *      Yield is not sourced from real revenue; fund the contract with stablecoins for demos.
- *      Uses SafeERC20 for tokens that do not return bool on transfer (e.g. some USDT deployments).
+ * @dev Role-based demo pool: deposits, linear yield, operator-issued loans with repayment.
+ *      Emits rich lifecycle events for indexers. Pausing blocks user deposits/withdrawals; repay stays open.
  */
-contract DemoLendingPool is Ownable, ReentrancyGuard {
+contract DemoLendingPool is AccessControl, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    bytes32 public constant POOL_MANAGER_ROLE = keccak256("POOL_MANAGER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     IERC20 public immutable asset;
 
@@ -24,25 +27,52 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
     }
 
     mapping(address => Deposit) public deposits;
-    /// @notice Outstanding principal owed by each borrower (owner-issued loans).
     mapping(address => uint256) public borrowerDebt;
 
     uint256 public totalLiquidity;
-    /// @notice Sum of outstanding loan principals (must be <= deposited liquidity notionally).
     uint256 public totalOutstandingLoans;
-
     uint256 public baseYieldRate = 500; // 5% APY in basis points (simplified linear accrual)
+    uint256 public loanNonce;
 
-    event Deposited(address indexed user, uint256 amount);
-    event Withdrawn(address indexed user, uint256 amount, uint256 yield_);
-    event LoanIssued(address indexed borrower, uint256 amount, uint256 term);
-    event LoanRepaid(address indexed borrower, uint256 amount);
+    event PoolBootstrapped(address indexed asset_, address indexed admin);
+    event Deposited(address indexed user, uint256 amount, uint256 totalLiquidityAfter);
+    event Withdrawn(address indexed user, uint256 principal, uint256 yield_, uint256 totalLiquidityAfter);
+    event YieldRateUpdated(uint256 previousRate, uint256 newRate, address indexed updatedBy);
+    event LoanIssued(
+        uint256 indexed loanId,
+        address indexed borrower,
+        uint256 amount,
+        uint256 term,
+        uint256 totalOutstandingAfter,
+        uint256 liquidityAfter
+    );
+    event LoanRepaid(
+        address indexed borrower,
+        uint256 amount,
+        uint256 remainingDebt,
+        uint256 totalLiquidityAfter
+    );
+    event LiquiditySnapshot(uint256 totalLiquidity, uint256 totalOutstandingLoans);
 
-    constructor(address asset_) Ownable(msg.sender) {
+    constructor(address asset_, address admin) {
+        require(asset_ != address(0) && admin != address(0), "Zero address");
         asset = IERC20(asset_);
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(POOL_MANAGER_ROLE, admin);
+        _grantRole(PAUSER_ROLE, admin);
+        emit PoolBootstrapped(asset_, admin);
+        emit LiquiditySnapshot(0, 0);
     }
 
-    function deposit(uint256 amount) external nonReentrant {
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    function deposit(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "Amount must be > 0");
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -57,10 +87,11 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         userDeposit.timestamp = block.timestamp;
         totalLiquidity += amount;
 
-        emit Deposited(msg.sender, amount);
+        emit Deposited(msg.sender, amount, totalLiquidity);
+        emit LiquiditySnapshot(totalLiquidity, totalOutstandingLoans);
     }
 
-    function withdraw(uint256 amount) external nonReentrant {
+    function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         Deposit storage userDeposit = deposits[msg.sender];
         require(userDeposit.amount >= amount, "Insufficient balance");
 
@@ -75,7 +106,8 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         uint256 totalToTransfer = amount + totalYield;
         asset.safeTransfer(msg.sender, totalToTransfer);
 
-        emit Withdrawn(msg.sender, amount, totalYield);
+        emit Withdrawn(msg.sender, amount, totalYield, totalLiquidity);
+        emit LiquiditySnapshot(totalLiquidity, totalOutstandingLoans);
     }
 
     function calculateYield(Deposit storage userDeposit) internal view returns (uint256) {
@@ -83,21 +115,25 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         return (userDeposit.amount * baseYieldRate * timeHeld) / (365 days * 10000);
     }
 
-    /// @notice Owner pulls liquidity for an undercollateralized demo loan; borrower must later repay.
-    function issueLoan(address borrower, uint256 amount, uint256 term) external onlyOwner nonReentrant {
+    function issueLoan(address borrower, uint256 amount, uint256 term) external onlyRole(POOL_MANAGER_ROLE) nonReentrant {
         require(borrower != address(0), "Invalid borrower");
         require(amount > 0, "Amount must be > 0");
         require(amount <= totalLiquidity, "Insufficient liquidity");
+
+        unchecked {
+            loanNonce++;
+        }
+        uint256 loanId = loanNonce;
 
         asset.safeTransfer(borrower, amount);
         totalLiquidity -= amount;
         borrowerDebt[borrower] += amount;
         totalOutstandingLoans += amount;
 
-        emit LoanIssued(borrower, amount, term);
+        emit LoanIssued(loanId, borrower, amount, term, totalOutstandingLoans, totalLiquidity);
+        emit LiquiditySnapshot(totalLiquidity, totalOutstandingLoans);
     }
 
-    /// @notice Repay outstanding demo loan principal back into the pool.
     function repayLoan(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be > 0");
         require(borrowerDebt[msg.sender] >= amount, "Repayment exceeds debt");
@@ -107,11 +143,18 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         totalOutstandingLoans -= amount;
         totalLiquidity += amount;
 
-        emit LoanRepaid(msg.sender, amount);
+        emit LoanRepaid(msg.sender, amount, borrowerDebt[msg.sender], totalLiquidity);
+        emit LiquiditySnapshot(totalLiquidity, totalOutstandingLoans);
     }
 
-    function setYieldRate(uint256 newRate) external onlyOwner {
+    function setYieldRate(uint256 newRate) external onlyRole(POOL_MANAGER_ROLE) {
         require(newRate <= 2000, "Rate too high");
+        uint256 prev = baseYieldRate;
         baseYieldRate = newRate;
+        emit YieldRateUpdated(prev, newRate, msg.sender);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }

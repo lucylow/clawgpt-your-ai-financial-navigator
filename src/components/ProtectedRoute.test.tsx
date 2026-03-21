@@ -8,6 +8,7 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+import { BROWSE_SESSION_KEY } from "@/lib/cockpitAccess";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 function Child() {
@@ -27,6 +28,33 @@ describe("ProtectedRoute", () => {
       loading: false,
       signOut: vi.fn(),
     });
+
+    render(
+      <MemoryRouter initialEntries={["/app"]}>
+        <Routes>
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <Child />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("protected-child")).toBeInTheDocument();
+  });
+
+  it("renders children when browse-cockpit flag is set (non-strict auth)", () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      session: null,
+      loading: false,
+      signOut: vi.fn(),
+    });
+    localStorage.setItem(BROWSE_SESSION_KEY, "1");
 
     render(
       <MemoryRouter initialEntries={["/app"]}>

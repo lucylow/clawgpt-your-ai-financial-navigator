@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { CockpitRouteGuard } from "@/config/security";
+import ObservabilityRouteListener from "@/components/ObservabilityRouteListener";
 import Index from "./pages/Index.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -52,17 +53,18 @@ function App() {
           <Toaster />
           <Sonner />
           <BrowserRouter basename={getRouterBasename()}>
+            <ObservabilityRouteListener />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route
                 path="/app"
                 element={
-                  <ProtectedRoute>
+                  <CockpitRouteGuard>
                     <Suspense fallback={<CockpitFallback />}>
                       <CockpitLayout />
                     </Suspense>
-                  </ProtectedRoute>
+                  </CockpitRouteGuard>
                 }
               >
                 <Route index element={<DashboardPage />} />

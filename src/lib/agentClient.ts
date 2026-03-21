@@ -1,4 +1,5 @@
 import { streamAgentMessage, type AgentMetadata } from "@/lib/agent";
+import { buildDemoTransferSafety, buildSafetyFromAgentMetadata } from "@/lib/agentSafety";
 import { assetRoleLabel } from "@/lib/economics/assetRoles";
 import { estimateSwapSlippage } from "@/lib/economics/executionCost";
 import {
@@ -25,6 +26,32 @@ export interface AgentClientResult {
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
+/** Live Supabase agent: attach a confirm card when the model prepared an ERC-20 transfer. */
+function transactionCardFromMetadata(metadata: AgentMetadata | undefined): ChatCardPayload | undefined {
+  const ctx = metadata?.contractContext;
+  if (!ctx || typeof ctx !== "object") return undefined;
+  const action = String((ctx as { action?: string }).action ?? "");
+  if (action !== "erc20_transfer") return undefined;
+
+  const chain = String((ctx as { chain?: string }).chain ?? "");
+  const to = (ctx as { to?: string }).to != null ? String((ctx as { to?: string }).to) : "";
+  const amount = Number((ctx as { amount?: number }).amount);
+  const asset = String((ctx as { asset?: string }).asset ?? "USDt");
+  const safety =
+    metadata?.safety ?? buildSafetyFromAgentMetadata({ contractContext: ctx, safety: metadata?.safety });
+
+  return {
+    kind: "transaction_ready",
+    amount,
+    asset,
+    toLabel: to.length >= 10 ? `${to.slice(0, 6)}…${to.slice(-4)}` : "Recipient",
+    chain,
+    toAddress: to || undefined,
+    feeEstimateUsd: safety.transactionSimulation.gasEstimateUsd,
+    safety,
+  };
+}
+
 function useMockAgent(): boolean {
   const flag = import.meta.env.VITE_USE_MOCK_AGENT;
   if (flag === "false") return false;
@@ -43,6 +70,95 @@ function delay(ms: number) {
 async function mockSendMessage(content: string): Promise<AgentClientResult> {
   const q = content.toLowerCase();
   await delay(400 + Math.random() * 400);
+
+  if (
+    q.includes("compare") &&
+    (q.includes("route") || q.includes("bridge") || q.includes("arbitrum") || q.includes("chain"))
+  ) {
+    return {
+      text:
+        "**Route comparison (demo model)**\n\n" +
+        "| Route | Est. total | ETA | Notes |\n" +
+        "|-------|------------|-----|-------|\n" +
+        "| **Direct:** Ethereum → Arbitrum | ~$8–10 (gas + relay demo) | ~12–24h full exit | Canonical rollup path |\n" +
+        "| **Via Polygon hub** (illustrative) | varies; extra hops | slower | Check live bridge quotes |\n\n" +
+        "Use **compare_chain_routes** on the live agent for amounts and guardrails. Prefer audited bridges for size.",
+      intent: "compare_routes",
+    };
+  }
+
+  if (
+    q.includes("gas") &&
+    (q.includes("explain") || q.includes("why") || q.includes("arbitrum") || q.includes("ethereum") || q.includes("vs"))
+  ) {
+    return {
+      text:
+        "**Gas explainer**\n\n" +
+        "• **Ethereum L1** — pays for scarce block space; spikes when demand is high.\n" +
+        "• **Arbitrum / Polygon** — execution is much cheaper; you still pay **L1 data** for some operations but net is often **10–100× lower** than mainnet for the same contract class.\n" +
+        "• **Swaps / bridges** cost more than simple sends because they run **more contract code**.\n\n" +
+        "Compare **gas as % of your notional** — if fees are a large fraction of the trade, batch, wait, or use an L2.",
+      intent: "explain_gas",
+    };
+  }
+
+  if (q.includes("rebalanc") || (q.includes("target") && q.includes("usdt"))) {
+    return {
+      text:
+        "**Rebalancing (demo policy)**\n\n" +
+        "• Set a **target USDt %** of NAV (liquidity sleeve) — e.g. **65%** USDt / **35%** XAUt hedge.\n" +
+        "• If drift is small (<~1–2%), **no trade** may be best.\n" +
+        "• To raise USDt: swap **XAUt → USDt** on an AMM chain with good depth; watch slippage.\n" +
+        "• To raise hedge: swap **USDt → XAUt**; keep **≥8%** USDt as operational reserve per cockpit guardrails.\n\n" +
+        "Live agent: **suggest_rebalancing** + **risk_check** before execution.",
+      intent: "rebalance",
+      proposedPlan: {
+        title: "Rebalance sleeves (review)",
+        steps: [
+          "Confirm target USDt % and current mix in Portfolio",
+          "Size swaps/bridges to close the gap",
+          "Run risk check and confirm in wallet",
+        ],
+        requiresOnChainConfirmation: true,
+      },
+    };
+  }
+
+  if (
+    q.includes("movement") ||
+    q.includes("what changed") ||
+    q.includes("flows") ||
+    (q.includes("summarize") && q.includes("portfolio"))
+  ) {
+    return {
+      text:
+        "**Portfolio movements (demo snapshot)**\n\n" +
+        "Net flows vs a **7-day prior** model: USDt and XAUt shifted slightly toward **Arbitrum** and **Ethereum** in the demo store. Open **Transactions** for settlement detail; live history uses your wallet connection.\n\n" +
+        "Ask the connected agent for a **full table** via **summarize_portfolio_movements**.",
+      intent: "movements_summary",
+    };
+  }
+
+  if (q.includes("draft") || (q.includes("plan") && (q.includes("transaction") || q.includes("yield")))) {
+    return {
+      text:
+        "**Draft transaction plan (yield example)**\n\n" +
+        "1. **Approve** USDt on your chosen chain (~1 gas unit).\n" +
+        "2. **Deposit** to Aave (or similar whitelisted protocol) — second tx.\n" +
+        "3. **Monitor** rates and health factor; keep exit liquidity for spending.\n\n" +
+        "Live agent: **draft_transaction_plan** with goal `increase_yield` and your notional.",
+      intent: "tx_plan",
+      proposedPlan: {
+        title: "Increase yield (staged)",
+        steps: [
+          "Approve token for lending pool",
+          "Deposit and verify position in Cockpit",
+          "Set alerts for rate / risk changes",
+        ],
+        requiresOnChainConfirmation: true,
+      },
+    };
+  }
 
   if (q.includes("analyze") || q.includes("risk score") || q.includes("opportunities")) {
     const a = PortfolioAnalyzerSkill.analyze();
@@ -230,6 +346,13 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
         feeEstimateUsd: spend.gasUsd,
         usdtAfterOnChain: spend.usdtAfter,
         reserveNote: "~8% local USDt floor preserved where possible",
+        safety: buildDemoTransferSafety(
+          chain,
+          envTo && envTo.startsWith("0x") ? envTo : undefined,
+          amount,
+          "USDt",
+          spend.gasUsd,
+        ),
       },
     };
   }
@@ -244,7 +367,13 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
 
   return {
     text:
-      "I'm running in **demo mode** with mocked reasoning. Try:\n- “Analyze portfolio risk”\n- “What’s my total portfolio?”\n- “Send 50 USDT to Sarah”\n- “Set up a recurring buy”\n- “Move idle USDT to Arbitrum”",
+      "I'm running in **demo mode** with mocked reasoning. Try:\n" +
+      "- “Summarize portfolio movements” / “What changed?”\n" +
+      "- “Suggest rebalancing to 65% USDt”\n" +
+      "- “Draft a transaction plan for yield”\n" +
+      "- “Explain gas on Arbitrum vs Ethereum”\n" +
+      "- “Compare bridge routes ETH → Arbitrum”\n" +
+      "- “Analyze portfolio risk” / “Send 50 USDT to Sarah” / “Move idle USDT to Arbitrum”",
     intent: "fallback",
   };
 }
@@ -280,6 +409,7 @@ async function streamToResult(
     portfolioUpdate,
     portfolioPreview: metadata?.portfolioPreview,
     intent: undefined,
+    card: transactionCardFromMetadata(metadata),
   };
 }
 
