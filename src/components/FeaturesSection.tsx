@@ -1,4 +1,5 @@
 import { MessageSquare, Globe, Shield, BarChart3 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const features = [
   {
@@ -27,32 +28,41 @@ const features = [
 export default function FeaturesSection() {
   return (
     <section id="features" className="relative scroll-mt-24 py-24 px-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <span className="text-xs font-semibold tracking-widest uppercase text-primary mb-3 block">
-            Why ClawGPT
-          </span>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+        <div className="mb-16 text-center">
+          <span className="landing-eyebrow">Why ClawGPT</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-5xl md:leading-tight">
             The cockpit for your digital wealth
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+          <p className="mx-auto max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
             Everything you need to manage your Tether-powered assets across chains,
             all through natural conversation.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
           {features.map((f, i) => (
             <div
               key={i}
-              className="glass-card-hover rounded-xl p-8 group"
-              style={{ animationDelay: `${i * 100}ms` }}
+              className={cn(
+                "group relative overflow-hidden rounded-2xl border border-white/[0.06] p-8 transition-all duration-300",
+                "glass-card-hover",
+                "animate-fade-in-up",
+              )}
+              style={{ animationDelay: `${i * 70}ms` }}
             >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
-                <f.icon className="text-primary" size={24} />
+              <div
+                className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+                aria-hidden
+              />
+              <div className="relative">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/25 via-violet-500/15 to-primary/5 ring-1 ring-white/10 transition-all duration-300 group-hover:from-primary/35 group-hover:ring-primary/25">
+                  <f.icon className="text-primary" size={24} strokeWidth={2} aria-hidden />
+                </div>
+                <h3 className="mb-2 text-xl font-semibold tracking-tight">{f.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{f.description}</p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">{f.title}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{f.description}</p>
             </div>
           ))}
         </div>

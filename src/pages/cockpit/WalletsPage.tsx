@@ -46,6 +46,9 @@ export default function WalletsPage() {
               <div>
                 <p className="text-sm font-medium text-foreground">{w.labelChain}</p>
                 <p className="text-xs text-muted-foreground font-mono">{w.address}</p>
+                {w.nativeSymbol && (
+                  <p className="text-[10px] text-muted-foreground/80 mt-0.5">Gas: {w.nativeSymbol}</p>
+                )}
               </div>
             </div>
             <p className="text-lg font-bold text-foreground">{w.balanceLabel}</p>

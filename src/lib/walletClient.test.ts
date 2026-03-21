@@ -53,4 +53,24 @@ describe("walletClient sendTransaction", () => {
     expect(mockIsReady).not.toHaveBeenCalled();
     expect(mockSendTetherTransfer).not.toHaveBeenCalled();
   });
+
+  it("classifies user-rejected transactions", async () => {
+    mockIsReady.mockReturnValue(true);
+    mockSendTetherTransfer.mockRejectedValue(new Error("user rejected the request"));
+    const { sendTransaction } = await import("@/lib/walletClient");
+    const r = await sendTransaction(
+      {
+        chain: "ethereum",
+        to: "0x0000000000000000000000000000000000000001",
+        amount: "1",
+        asset: "USDt",
+      },
+      { kind: "user_confirmed", confirmedAtMs: Date.now() },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("USER_REJECTED");
+      expect(r.recoveryHint).toBeTruthy();
+    }
+  });
 });

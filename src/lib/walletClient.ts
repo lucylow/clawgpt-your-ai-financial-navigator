@@ -13,6 +13,8 @@ import { getQueryClient } from "@/lib/queryClientSingleton";
 import { queryKeys } from "@/lib/queryKeys";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { logChainExecution } from "@/lib/observability";
+import { formatGasSummary, simulateTetherEvmTransfer } from "@/lib/evmSimulation";
+import { classifyWalletError } from "@/lib/web3Errors";
 
 type WdkModule = typeof import("@/lib/wdkClient");
 
@@ -208,8 +210,61 @@ export type SendTransactionResult =
   | {
       ok: false;
       error: string;
-      code: "WALLET_NOT_READY" | "VALIDATION" | "CHAIN_UNSUPPORTED" | "EXECUTION";
+      code:
+        | "WALLET_NOT_READY"
+        | "VALIDATION"
+        | "CHAIN_UNSUPPORTED"
+        | "EXECUTION"
+        | "USER_REJECTED"
+        | "NETWORK"
+        | "INSUFFICIENT_FUNDS"
+        | "NONCE";
+      /** Short recovery hint for UI (toasts, inline help). */
+      recoveryHint?: string;
     };
+
+export type SimulateTetherResult =
+  | { ok: true; summary: string; evm: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Dry-run ERC-20 transfer via eth_call + eth_estimateGas before the user signs with WDK.
+ * Non-EVM chains return OK with a note (RPC path not wired here).
+ */
+export async function simulateTetherTransfer(params: SendTransactionParams): Promise<SimulateTetherResult> {
+  if (!(SUPPORTED_WDK_CHAINS as readonly string[]).includes(params.chain)) {
+    return { ok: false, error: `Unsupported chain: ${params.chain}` };
+  }
+  const chain = params.chain as WdkChainId;
+  if (!params.to?.trim()) return { ok: false, error: "Recipient address is required." };
+  const amt = Number.parseFloat(params.amount);
+  if (!Number.isFinite(amt) || amt <= 0) return { ok: false, error: "Invalid amount." };
+
+  try {
+    const { clawWdk } = await loadWdkModule();
+    if (!clawWdk.isReady()) {
+      return { ok: false, error: "Wallet not connected." };
+    }
+
+    if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
+      const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
+      const from = await clawWdk.getSignerAddressForChain(chain);
+      const sim = await simulateTetherEvmTransfer(chain, from, params.to.trim(), params.amount, asset);
+      if (!sim.ok) {
+        return { ok: false, error: sim.error };
+      }
+      return { ok: true, evm: true, summary: formatGasSummary(sim) };
+    }
+
+    return {
+      ok: true,
+      evm: false,
+      summary: `${chain}: RPC transfer simulation not wired; confirm amount and destination carefully.`,
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export async function sendTransaction(
   params: SendTransactionParams,
@@ -322,18 +377,21 @@ export async function sendTransaction(
     });
     return { ok: true, hash: r.hash, status: r.status };
   } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    const classified = classifyWalletError(raw);
     logChainExecution({
       operation: "wallet.send_transaction",
       phase: "end",
       chain,
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
-      detail: { code: "EXECUTION" },
+      error: classified.message,
+      detail: { code: classified.code },
     });
     return {
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
-      code: "EXECUTION",
+      error: classified.message,
+      code: classified.code,
+      recoveryHint: classified.hint,
     };
   }
 }
@@ -354,15 +412,18 @@ export async function restoreSessionIfNeeded(): Promise<void> {
     if (!connected || mode !== "wdk" || !seed) return;
     const r = await connectDemoWallet(seed);
     if (!r.success) {
-      const msg = r.error?.trim()
-        ? `Session restore: ${r.error}`
+      const raw = r.error?.trim() ?? "";
+      const classified = raw ? classifyWalletError(raw) : null;
+      const msg = classified
+        ? `Session restore: ${classified.message} — ${classified.hint}`
         : "Could not restore wallet session after reload.";
       usePortfolioStore.getState().setPortfolioSyncError(msg);
       return;
     }
     await refreshLivePortfolio();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Session restore failed.";
-    usePortfolioStore.getState().setPortfolioSyncError(msg);
+    const raw = e instanceof Error ? e.message : "Session restore failed.";
+    const classified = classifyWalletError(raw);
+    usePortfolioStore.getState().setPortfolioSyncError(`${classified.message} — ${classified.hint}`);
   }
 }

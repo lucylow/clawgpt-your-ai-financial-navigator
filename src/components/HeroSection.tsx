@@ -11,14 +11,18 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-[#1a1030]/90 to-background"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-[#15102a]/95 to-background"
       aria-labelledby="hero-heading"
     >
       <OrbitalParticles className="pointer-events-none absolute inset-0 h-full min-h-[100dvh] w-full" />
 
       {/* Vignette + depth */}
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(10,15,31,0.85)_70%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(10,15,31,0.78)_72%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-10%,hsl(239_84%_67%/0.12),transparent_55%)]"
         aria-hidden
       />
 
@@ -27,14 +31,14 @@ export default function HeroSection() {
           initial={reduceMotion ? false : { opacity: 0, y: 48 }}
           animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="glass-card-neon glow-border-neon max-w-4xl rounded-3xl px-6 py-10 text-center shadow-2xl shadow-indigo-500/10 sm:px-10 sm:py-12 md:px-14"
+          className="glass-card-neon glow-border-neon max-w-4xl rounded-[1.75rem] px-6 py-10 text-center shadow-2xl shadow-indigo-500/15 ring-1 ring-white/[0.08] sm:px-10 sm:py-12 md:px-14"
         >
-          <div className="mb-8 inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-3 shadow-lg shadow-indigo-500/25 sm:gap-4 sm:px-6">
-            <ClawLogo className="h-8 w-8 sm:h-9 sm:w-9" />
+          <div className="mb-8 inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#6366f1] via-[#7c3aed] to-[#8b5cf6] px-5 py-3 shadow-lg shadow-indigo-500/30 ring-1 ring-white/15 sm:gap-4 sm:px-6">
+            <ClawLogo className="h-8 w-8 drop-shadow sm:h-9 sm:w-9" />
             <span className="text-base font-bold tracking-tight text-white sm:text-lg">
               ClawGPT Financial Cockpit
             </span>
-            <Badge variant="testnet" className="font-semibold uppercase tracking-wide">
+            <Badge variant="testnet" className="border-white/20 bg-white/10 font-semibold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
               WDK Testnet
             </Badge>
           </div>
@@ -55,17 +59,17 @@ export default function HeroSection() {
             moves on-chain (or in demo).
           </p>
 
-          <ul className="mx-auto mb-10 flex max-w-xl flex-col gap-2 text-left text-sm text-[#CBD5E1] sm:text-base">
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#818cf8]" aria-hidden />
+          <ul className="mx-auto mb-10 flex max-w-xl flex-col gap-2 rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent px-4 py-4 text-left text-sm text-[#CBD5E1] shadow-inner shadow-black/20 sm:px-5 sm:text-base">
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#a5b4fc]" aria-hidden />
               <span>Self-custodial via Tether WDK — keys stay with you.</span>
             </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#818cf8]" aria-hidden />
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#a5b4fc]" aria-hidden />
               <span>Natural-language tasks with review cards, workflow log, and audit trail.</span>
             </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#818cf8]" aria-hidden />
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#a5b4fc]" aria-hidden />
               <span>Multi-chain USDt / XAUt context — dashboard + ticker mirror the real cockpit.</span>
             </li>
           </ul>
@@ -109,7 +113,7 @@ export default function HeroSection() {
         </motion.div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] h-28 bg-gradient-to-t from-[#0A0F1F] to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[5] h-32 bg-gradient-to-t from-[#0A0F1F] via-[#0A0F1F]/85 to-transparent" />
     </section>
   );
 }

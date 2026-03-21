@@ -70,7 +70,12 @@ export default function BackendNotificationsBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
-          <span className="text-xs font-medium text-muted-foreground">Live stream</span>
+          <div className="min-w-0">
+            <span className="text-xs font-medium text-muted-foreground">Live stream</span>
+            <p className="text-[10px] text-muted-foreground/90 truncate">
+              {streamConnected ? "Subscribed to Postgres changes" : "Connecting…"}
+            </p>
+          </div>
           {unreadSafe > 0 && (
             <button
               type="button"

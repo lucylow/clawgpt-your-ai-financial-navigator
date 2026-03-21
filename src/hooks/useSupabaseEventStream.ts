@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,10 +50,12 @@ function metadataAsRecord(v: unknown): Record<string, unknown> {
 export function useSupabaseEventStream() {
   const { user } = useAuth();
   const userId = user?.id;
+  const subscribedOnce = useRef(false);
 
   useEffect(() => {
     if (!userId) {
       useBackendStreamStore.getState().reset();
+      subscribedOnce.current = false;
       return;
     }
 
@@ -71,6 +73,13 @@ export function useSupabaseEventStream() {
       if (!isTxRow(row)) return;
       const tx = mapTransactionRow(row);
       usePortfolioStore.getState().upsertTransactionFromBackend(tx);
+      if (payload.eventType === "INSERT") {
+        toast.info("Transaction synced", {
+          description: `${tx.type} · ${tx.hash.length > 14 ? `${tx.hash.slice(0, 10)}…` : tx.hash}`,
+          duration: 4200,
+          id: `tx-${tx.hash}`,
+        });
+      }
     };
 
     const onSnapshot = (payload: RealtimePostgresChangesPayload<Tables<"portfolio_snapshots">>) => {
@@ -99,7 +108,11 @@ export function useSupabaseEventStream() {
       };
       useBackendStreamStore.getState().pushNotification(n);
       if (n.read_at == null) {
-        toast(n.title, { description: n.body ?? undefined });
+        toast(n.title, {
+          description: n.body ?? undefined,
+          duration: 6500,
+          id: `notification-${n.id}`,
+        });
       }
     };
 
@@ -115,8 +128,15 @@ export function useSupabaseEventStream() {
         created_at: row.created_at,
       };
       useBackendStreamStore.getState().pushActivity(a);
+      const desc = [a.category, a.detail].filter(Boolean).join(" · ") || undefined;
+      toast.message(a.summary, {
+        description: desc,
+        duration: 5000,
+        id: `activity-${a.id}`,
+      });
     };
 
+    let cancelled = false;
     const channel = supabase
       .channel(`cockpit-events:${uid}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, onTx)
@@ -124,13 +144,31 @@ export function useSupabaseEventStream() {
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter }, onNotification)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_feed", filter }, onActivity)
       .subscribe((status) => {
-        if (status === "SUBSCRIBED") setStreamConnected(true);
+        if (status === "SUBSCRIBED") {
+          setStreamConnected(true);
+          if (!subscribedOnce.current) {
+            subscribedOnce.current = true;
+            toast.success("Live updates connected", {
+              description: "Transactions, portfolio snapshots, and notifications stream in real time.",
+              duration: 3200,
+              id: "realtime-handshake",
+            });
+          }
+        }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           setStreamConnected(false);
+          if (subscribedOnce.current && !cancelled) {
+            toast.warning("Live stream interrupted", {
+              description: "Reconnecting in the background…",
+              duration: 4000,
+              id: "realtime-reconnect",
+            });
+          }
         }
       });
 
     return () => {
+      cancelled = true;
       setStreamConnected(false);
       void supabase.removeChannel(channel);
     };

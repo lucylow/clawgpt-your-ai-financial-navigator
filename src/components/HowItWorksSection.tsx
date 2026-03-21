@@ -19,26 +19,37 @@ const steps = [
 export default function HowItWorksSection() {
   return (
     <section id="how-it-works" className="relative scroll-mt-24 py-24 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-16 text-center">
+          <span className="landing-eyebrow">Three beats</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-5xl md:leading-tight">
             From chat to chain in seconds
           </h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
+          <p className="mx-auto max-w-lg text-base text-muted-foreground md:text-lg md:leading-relaxed">
             The detailed eight-step journey lives above — here are the three beats most people feel on day one.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {steps.map((s, i) => (
-            <div key={i} className="glass-card-hover rounded-xl p-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5 text-2xl font-bold text-primary">
-                {s.num}
+        <div className="relative">
+          <div
+            className="pointer-events-none absolute left-[16%] right-[16%] top-7 hidden h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent md:block"
+            aria-hidden
+          />
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8">
+            {steps.map((s, i) => (
+              <div
+                key={i}
+                className="glass-card-hover relative rounded-2xl border border-white/[0.05] p-8 text-center shadow-sm shadow-black/15"
+              >
+                <div className="relative z-[1] mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-violet-500/15 to-primary/5 text-2xl font-bold text-primary ring-2 ring-primary/25 ring-offset-4 ring-offset-background">
+                  {s.num}
+                </div>
+                <h3 className="mb-2 text-lg font-semibold tracking-tight">{s.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
               </div>
-              <h3 className="text-lg font-semibold mb-2">{s.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>

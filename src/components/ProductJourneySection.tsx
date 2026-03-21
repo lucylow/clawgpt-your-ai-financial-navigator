@@ -60,17 +60,15 @@ export default function ProductJourneySection() {
       className="relative scroll-mt-24 py-20 px-4 sm:py-28"
       aria-labelledby="journey-heading"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
       <div className="mx-auto max-w-6xl">
         <div className="mb-14 text-center sm:mb-16">
-          <span className="mb-3 block text-xs font-semibold uppercase tracking-widest text-primary">
-            End-to-end flow
-          </span>
-          <h2 id="journey-heading" className="mb-4 text-3xl font-bold tracking-tight md:text-5xl">
+          <span className="landing-eyebrow">End-to-end flow</span>
+          <h2 id="journey-heading" className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-5xl md:leading-tight">
             From landing page to confirmed action
           </h2>
-          <p className="mx-auto max-w-2xl text-muted-foreground md:text-lg">
+          <p className="mx-auto max-w-2xl text-base text-muted-foreground md:text-lg md:leading-relaxed">
             ClawGPT is built around a single journey: understand the product, authenticate, use the cockpit, and always
             review before you execute.
           </p>
@@ -86,17 +84,17 @@ export default function ProductJourneySection() {
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {phases.map((phase, i) => (
             <li key={phase.title}>
-              <article className="glass-card-hover flex h-full flex-col rounded-xl p-6 text-left">
+              <article className="glass-card-hover flex h-full flex-col rounded-2xl border border-white/[0.05] p-6 text-left shadow-sm shadow-black/20">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/20"
                     aria-hidden
                   >
                     {i + 1}
                   </span>
-                  <phase.icon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                  <phase.icon className="h-5 w-5 shrink-0 text-primary/70" aria-hidden />
                 </div>
-                <h3 className="mb-2 text-base font-semibold leading-snug">{phase.title}</h3>
+                <h3 className="mb-2 text-base font-semibold leading-snug tracking-tight">{phase.title}</h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">{phase.body}</p>
               </article>
             </li>

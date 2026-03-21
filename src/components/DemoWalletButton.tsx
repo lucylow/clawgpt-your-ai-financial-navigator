@@ -24,6 +24,7 @@ export default function DemoWalletButton({
   const [busy, setBusy] = useState(false);
   const connectDemoWallet = useDemoStore((s) => s.connectDemoWallet);
   const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
+  const walletConnectPhase = useDemoStore((s) => s.walletConnectPhase);
 
   const handleClick = async () => {
     setBusy(true);
@@ -108,7 +109,10 @@ export default function DemoWalletButton({
       )}
     >
       <Sparkles className="h-5 w-5 shrink-0 opacity-95 sm:h-6 sm:w-6" aria-hidden />
-      {busy ? "Connecting…" : "Launch demo"}
+      <span className="sr-only" aria-live="polite">
+        {busy && walletConnectPhase ? walletConnectPhase : busy ? "Connecting" : ""}
+      </span>
+      {busy ? walletConnectPhase ?? "Connecting…" : "Launch demo"}
     </motion.button>
   );
 }

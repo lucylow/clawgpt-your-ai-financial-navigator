@@ -32,7 +32,7 @@ export default function CockpitDashboard() {
 
   return (
     <div
-      className="flex flex-col h-full p-4 gap-4 overflow-y-auto"
+      className="flex flex-col h-full min-h-0 p-3 gap-3 overflow-y-auto sm:p-4 sm:gap-4"
       role="region"
       aria-label="Cockpit operations overview"
     >
@@ -43,7 +43,7 @@ export default function CockpitDashboard() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
         <div className="glass-card rounded-lg px-4 py-3 flex items-start gap-3">
           <div className="mt-0.5 rounded-md bg-primary/15 p-2 text-primary">
             <Wallet className="h-4 w-4" aria-hidden />
@@ -79,13 +79,13 @@ export default function CockpitDashboard() {
         <h2 id="cockpit-globe-metrics-heading" className="sr-only">
           Globe and headline balances
         </h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="glass-card rounded-xl overflow-hidden h-[280px]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+          <div className="glass-card rounded-xl overflow-hidden h-[220px] sm:h-[260px] lg:h-[280px] min-h-0">
             <CockpitGlobe allocation={allocation} />
           </div>
-          <div className="glass-card rounded-xl p-6 flex flex-col justify-center">
+          <div className="glass-card rounded-xl p-4 sm:p-6 flex flex-col justify-center min-h-0">
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Total portfolio</p>
-            <p className="text-4xl font-bold text-foreground mb-4 tabular-nums">
+            <p className="text-3xl sm:text-4xl font-bold text-foreground mb-3 sm:mb-4 tabular-nums">
               ${safeTotalValue.toLocaleString()}
             </p>
             <div className="space-y-3">

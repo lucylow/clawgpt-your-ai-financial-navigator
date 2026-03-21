@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { GitBranch, LayoutGrid, Mail, Menu, PlayCircle, Route } from "lucide-react";
 import DemoWalletButton from "@/components/DemoWalletButton";
+import { ClawLogo } from "@/components/ClawLogo";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -67,8 +68,9 @@ export default function Navbar() {
           <div className="flex min-h-16 items-center justify-between gap-4 py-2 md:py-0">
             <Link
               to="/"
-              className="flex shrink-0 items-center gap-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0F1F] rounded-sm"
+              className="flex shrink-0 items-center gap-2.5 rounded-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0F1F]"
             >
+              <ClawLogo className="h-8 w-8" />
               <span className="text-xl font-bold tracking-tight">ClawGPT</span>
               <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">Beta</span>
             </Link>

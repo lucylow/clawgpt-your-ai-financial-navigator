@@ -45,7 +45,7 @@ export default function CockpitLayout() {
         )}
       >
         <CockpitHeader />
-        <main className="flex-1 overflow-hidden pb-[5.5rem] md:pb-0">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[max(5.5rem,env(safe-area-inset-bottom))] md:pb-0">
           <WalletErrorBoundary>
             <Suspense
               fallback={

@@ -105,24 +105,38 @@ export default function DemoSection() {
 
   return (
     <section id="demo" className="relative scroll-mt-24 py-24 px-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">See it in action</h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
+        <div className="mb-16 text-center">
+          <span className="landing-eyebrow">Interactive</span>
+          <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-5xl md:leading-tight">
+            See it in action
+          </h2>
+          <p className="mx-auto max-w-xl text-base text-muted-foreground md:text-lg md:leading-relaxed">
             Type a message — including <span className="text-foreground/90">“send …”</span> — to walk through{" "}
             <strong className="font-semibold text-foreground/95">review → confirm → next workflow</strong>, the same rhythm
             as the cockpit assistant.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Chat panel */}
-          <div className="glass-card rounded-xl overflow-hidden flex flex-col h-[480px]">
-            <div className="px-5 py-4 border-b border-border/30 flex items-center gap-3">
-              <span className="text-lg">🤖</span>
+          <div className="flex h-[480px] flex-col overflow-hidden rounded-2xl border border-white/[0.06] glass-card shadow-xl shadow-black/30 ring-1 ring-white/[0.04]">
+            <div className="flex items-center gap-2 border-b border-border/30 bg-secondary/20 px-4 py-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" aria-hidden />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" aria-hidden />
+            </div>
+            <div className="flex items-center gap-3 border-b border-border/25 px-5 py-4">
+              <span
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-violet-500/20 text-lg shadow-inner ring-1 ring-white/10"
+                aria-hidden
+              >
+                🤖
+              </span>
               <div>
-                <p className="text-sm font-semibold">Claw</p>
-                <p className="text-xs text-primary">online</p>
+                <p className="text-sm font-semibold tracking-tight">Claw</p>
+                <p className="text-xs font-medium text-primary">Online · assistant</p>
               </div>
             </div>
 
@@ -213,8 +227,8 @@ export default function DemoSection() {
               </div>
 
               {/* Tx feed */}
-              <div className="glass-card rounded-lg p-4 mt-auto">
-                <p className="text-xs font-mono text-primary">
+              <div className="mt-auto rounded-xl border border-primary/20 bg-primary/5 p-4 ring-1 ring-primary/10">
+                <p className="font-mono text-xs text-primary">
                   ► 12:04 SENT 50 USDt → 0x3f2... (ETH) ✔
                 </p>
               </div>

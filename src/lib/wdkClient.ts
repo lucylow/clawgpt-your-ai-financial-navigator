@@ -129,7 +129,15 @@ export class ClawWdkBridge {
   async getPrimaryAddress(): Promise<string> {
     if (!this.wdk) throw new Error("WDK not connected");
     const acc = await this.wdk.getAccount("ethereum", 0);
-    return acc.getAddress();
+    return await acc.getAddress();
+  }
+
+  /** EVM / non-EVM signer address for portfolio labels and RPC simulation `from`. */
+  async getSignerAddressForChain(chain: WdkChainId): Promise<string> {
+    if (!this.wdk) throw new Error("WDK not connected");
+    const acc = await this.wdk.getAccount(chain, 0);
+    const addr = await acc.getAddress();
+    return addr;
   }
 
   async fetchBalances(chain: WdkChainId): Promise<{
@@ -267,6 +275,7 @@ export class ClawWdkBridge {
           chain,
           address: shortAddress(row.address),
           label: chain === "ethereum" ? "Primary" : chain,
+          nativeSymbol: row.nativeLabel,
         });
         const usdt = row.balances.USDT ?? 0;
         const xaut = row.balances.XAUT ?? 0;

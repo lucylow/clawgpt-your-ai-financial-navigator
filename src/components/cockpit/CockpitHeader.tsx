@@ -12,6 +12,7 @@ import { getDemoPortfolioSnapshot } from "@/lib/mockData";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { cn } from "@/lib/utils";
 import BackendNotificationsBell from "@/components/cockpit/BackendNotificationsBell";
+import CockpitChainSwitcher from "@/components/cockpit/CockpitChainSwitcher";
 
 function initialsFromUser(user: { email?: string | null; user_metadata?: { full_name?: string } } | null) {
   const name = user?.user_metadata?.full_name?.trim();
@@ -110,6 +111,7 @@ export default function CockpitHeader() {
         </div>
 
         <div className="flex items-center justify-end gap-2 shrink-0 pl-10 sm:pl-0">
+          {isDemoWalletConnected && <CockpitChainSwitcher />}
           {showPortfolioPulse && (
             <div
               className="hidden md:flex flex-col items-end text-right mr-1 border-r border-border/40 pr-3"

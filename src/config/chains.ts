@@ -14,6 +14,19 @@ export const SUPPORTED_WDK_CHAINS = [
 
 export type WdkChainId = (typeof SUPPORTED_WDK_CHAINS)[number];
 
+/** UI + chain-id metadata for cockpit (testnets aligned with default RPCs in getEvmRpc). */
+export const COCKPIT_CHAIN_META: Record<
+  WdkChainId,
+  { label: string; network: string; chainId: number | null; native: string }
+> = {
+  ethereum: { label: "Ethereum", network: "Sepolia", chainId: 11155111, native: "ETH" },
+  polygon: { label: "Polygon", network: "Amoy", chainId: 80002, native: "POL" },
+  arbitrum: { label: "Arbitrum", network: "Sepolia", chainId: 421614, native: "ETH" },
+  solana: { label: "Solana", network: "Devnet", chainId: null, native: "SOL" },
+  tron: { label: "Tron", network: "Shasta", chainId: null, native: "TRX" },
+  ton: { label: "TON", network: "Testnet", chainId: null, native: "TON" },
+};
+
 function env(key: string, fallback: string): string {
   const v = (import.meta.env as Record<string, string | undefined>)[key];
   return v && v.trim().length > 0 ? v : fallback;

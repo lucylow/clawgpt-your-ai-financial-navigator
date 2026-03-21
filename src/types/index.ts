@@ -111,6 +111,8 @@ export interface WalletEntry {
   chain: string;
   address: string;
   label: string;
+  /** Native gas token symbol from WDK balance fetch (e.g. ETH, SOL). */
+  nativeSymbol?: string;
 }
 
 export interface AgentSliceState {

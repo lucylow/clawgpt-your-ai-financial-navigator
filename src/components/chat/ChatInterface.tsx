@@ -10,6 +10,7 @@ import {
   isRealWdkSession,
   refreshLivePortfolio,
   sendTransaction,
+  simulateTetherTransfer,
 } from "@/lib/walletClient";
 import { createUserConfirmedIntent } from "@/lib/securityModel";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
@@ -20,6 +21,8 @@ import type { ChatCardPayload, Message, Transaction } from "@/types";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import { useProactiveAgent } from "@/hooks/useProactiveAgent";
+import { COCKPIT_CHAIN_META } from "@/config/chains";
+import { useCockpitChainStore } from "@/store/useCockpitChainStore";
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -151,6 +154,18 @@ export default function ChatInterface() {
             return;
           }
 
+          const evmChains = ["ethereum", "polygon", "arbitrum"] as const;
+          if (!evmChains.includes(card.chain as (typeof evmChains)[number])) {
+            toast({
+              variant: "destructive",
+              title: "Live send not wired for this chain",
+              description:
+                "WDK token transfers in this build use Ethereum, Polygon, or Arbitrum testnets. Use demo mode to simulate other chains.",
+            });
+            appendAgentWorkflow("execute", "Aborted: non-EVM chain for live send");
+            return;
+          }
+
           const risk = assessTransaction({
             amountUsd: card.amount,
             to: recipient,
@@ -176,6 +191,28 @@ export default function ChatInterface() {
             });
           }
 
+          const sim = await simulateTetherTransfer({
+            chain: card.chain,
+            to: recipient,
+            amount: String(card.amount),
+            asset: card.asset === "XAUt" ? "XAUt" : "USDt",
+          });
+          if (!sim.ok) {
+            toast({
+              variant: "destructive",
+              title: "Simulation failed",
+              description: sim.error,
+            });
+            appendAgentWorkflow("review", `RPC simulation failed: ${sim.error}`);
+            appendDecisionAudit({ kind: "rejection", summary: "Simulation reverted or RPC error", detail: { sim } });
+            return;
+          }
+          appendAgentWorkflow("review", `RPC simulation OK — ${sim.summary}`);
+          toast({
+            title: "Simulation OK",
+            description: sim.summary,
+          });
+
           const res = await sendTransaction(
             {
               chain: card.chain,
@@ -187,8 +224,13 @@ export default function ChatInterface() {
           );
           if (!res.ok) {
             const errMsg = (res as { error: string }).error;
-            toast({ variant: "destructive", title: "Transfer failed", description: errMsg });
-            appendAgentWorkflow("execute", `Failed: ${errMsg}`);
+            const hint = (res as { recoveryHint?: string }).recoveryHint;
+            toast({
+              variant: "destructive",
+              title: "Transfer failed",
+              description: hint ? `${errMsg} · ${hint}` : errMsg,
+            });
+            appendAgentWorkflow("execute", `Failed: ${errMsg}${hint ? ` (${hint})` : ""}`);
             return;
           }
           const tx: Transaction = {
@@ -439,7 +481,11 @@ export default function ChatInterface() {
                 aria-hidden
               />
               <span className="text-primary">
-                {isThinking ? "Thinking…" : wdkLive ? "Online · WDK session" : "Online · mock or Supabase"}
+                {isThinking
+                  ? "Thinking…"
+                  : wdkLive
+                    ? `Online · WDK · ${chainCtx.label} (${chainCtx.network})`
+                    : "Online · mock or Supabase"}
               </span>
             </span>
           </p>

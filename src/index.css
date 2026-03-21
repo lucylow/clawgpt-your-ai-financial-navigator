@@ -136,6 +136,26 @@
     min-height: 44px;
     min-width: 44px;
   }
+
+  /** Marketing landing — section label + gradient frame */
+  .landing-eyebrow {
+    @apply mb-3 block text-xs font-semibold uppercase tracking-[0.2em] text-primary;
+  }
+
+  .landing-gradient-border {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--glass-border) / 0.45),
+      hsl(239 84% 67% / 0.35),
+      hsl(var(--glass-border) / 0.35)
+    );
+    padding: 1px;
+    border-radius: 1.5rem;
+  }
+
+  .landing-gradient-border-inner {
+    @apply rounded-[calc(1.5rem-1px)] bg-[hsl(222_47%_8%/0.92)] backdrop-blur-xl;
+  }
 }
 
 @keyframes float {
@@ -173,5 +193,11 @@ html {
 
   html {
     scroll-behavior: auto;
+  }
+
+  .animate-fade-in-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

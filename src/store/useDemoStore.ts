@@ -4,6 +4,7 @@ import {
   WALLET_MODE_KEY,
 } from "@/lib/demoWallet";
 import { getDemoPortfolioSnapshot, randomMockTransaction } from "@/lib/mockData";
+import { classifyWalletError } from "@/lib/web3Errors";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import type { NestedAllocation } from "@/types";
 
@@ -11,6 +12,8 @@ interface DemoState {
   isDemoWalletConnected: boolean;
   /** UI badge: real WDK vs mock balances */
   walletMode: "demo" | "wdk";
+  /** Non-null while connect is in progress (landing / wallet button). */
+  walletConnectPhase: string | null;
   connectDemoWallet: () => Promise<void>;
   disconnectDemoWallet: () => void;
   /** Drop WDK session errors and use rich mock portfolio (cockpit stays “connected”). */
@@ -63,8 +66,10 @@ function safeLocalRemove(key: string): void {
 export const useDemoStore = create<DemoState>((set, get) => ({
   isDemoWalletConnected: readDemo(),
   walletMode: readWalletMode(),
+  walletConnectPhase: null,
 
   connectDemoWallet: async () => {
+    set({ walletConnectPhase: "Preparing…" });
     if (import.meta.env.VITE_USE_WDK === "false") {
       if (!safeLocalSet(DEMO_SESSION_KEY, "1")) {
         usePortfolioStore
@@ -72,7 +77,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
           .setPortfolioSyncError("Could not save session (storage blocked or full). Demo data is in-memory only.");
       }
       safeSessionSet(WALLET_MODE_KEY, "demo");
-      set({ isDemoWalletConnected: true, walletMode: "demo" });
+      set({ isDemoWalletConnected: true, walletMode: "demo", walletConnectPhase: null });
       usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
       return;
     }
@@ -80,6 +85,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     let connectWdkSession: typeof import("@/lib/walletClient").connectDemoWallet;
     let refreshLivePortfolio: typeof import("@/lib/walletClient").refreshLivePortfolio;
     try {
+      set({ walletConnectPhase: "Loading wallet SDK…" });
       const mod = await import("@/lib/walletClient");
       connectWdkSession = mod.connectDemoWallet;
       refreshLivePortfolio = mod.refreshLivePortfolio;
@@ -92,11 +98,12 @@ export const useDemoStore = create<DemoState>((set, get) => ({
           : `Wallet module failed to load: ${msg}`,
       );
       safeSessionSet(WALLET_MODE_KEY, "demo");
-      set({ isDemoWalletConnected: true, walletMode: "demo" });
+      set({ isDemoWalletConnected: true, walletMode: "demo", walletConnectPhase: null });
       usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
       return;
     }
 
+    set({ walletConnectPhase: "Connecting multi-chain session…" });
     const result = await connectWdkSession();
     if (result.success) {
       if (!safeLocalSet(DEMO_SESSION_KEY, "1")) {
@@ -106,28 +113,28 @@ export const useDemoStore = create<DemoState>((set, get) => ({
       }
       set({ isDemoWalletConnected: true, walletMode: "wdk" });
       try {
+        set({ walletConnectPhase: "Syncing live balances…" });
         await refreshLivePortfolio();
+        set({ walletConnectPhase: null });
       } catch {
         safeSessionSet(WALLET_MODE_KEY, "demo");
-        set({ walletMode: "demo" });
+        set({ walletMode: "demo", walletConnectPhase: null });
         usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
       }
       return;
     }
 
     const errDetail = result.error?.trim();
+    const classified = errDetail ? classifyWalletError(errDetail) : null;
+    const errSummary = classified ? `${classified.message} — ${classified.hint}` : errDetail || "Live wallet unavailable.";
     const persisted = safeLocalSet(DEMO_SESSION_KEY, "1");
     usePortfolioStore.getState().setPortfolioSyncError(
       !persisted
-        ? errDetail
-          ? `Live wallet: ${errDetail}. Demo portfolio active; session not saved (storage blocked).`
-          : "Live wallet unavailable. Demo portfolio active; session not saved (storage blocked)."
-        : errDetail
-          ? `Live wallet: ${errDetail}. Using demo portfolio.`
-          : "Live wallet unavailable. Using demo portfolio.",
+        ? `Live wallet: ${errSummary} Demo portfolio active; session not saved (storage blocked).`
+        : `Live wallet: ${errSummary} Using demo portfolio.`,
     );
     safeSessionSet(WALLET_MODE_KEY, "demo");
-    set({ isDemoWalletConnected: true, walletMode: "demo" });
+    set({ isDemoWalletConnected: true, walletMode: "demo", walletConnectPhase: null });
     usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
   },
 
@@ -135,14 +142,14 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     void import("@/lib/walletClient").then(({ disconnectWalletSession }) => disconnectWalletSession());
     safeLocalRemove(DEMO_SESSION_KEY);
     safeSessionSet(WALLET_MODE_KEY, "demo");
-    set({ isDemoWalletConnected: false, walletMode: "demo" });
+    set({ isDemoWalletConnected: false, walletMode: "demo", walletConnectPhase: null });
   },
 
   enterDemoMode: () => {
     void import("@/lib/walletClient").then(({ disconnectWalletSession }) => disconnectWalletSession());
     safeSessionSet(WALLET_MODE_KEY, "demo");
     safeLocalSet(DEMO_SESSION_KEY, "1");
-    set({ isDemoWalletConnected: true, walletMode: "demo" });
+    set({ isDemoWalletConnected: true, walletMode: "demo", walletConnectPhase: null });
     usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
     usePortfolioStore.getState().setPortfolioSyncError(null);
   },
