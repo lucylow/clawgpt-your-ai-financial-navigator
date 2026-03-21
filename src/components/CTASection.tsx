@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DemoWalletButton from "@/components/DemoWalletButton";
 
 export default function CTASection() {
   const [email, setEmail] = useState("");
@@ -43,6 +44,11 @@ export default function CTASection() {
           <p className="text-xs text-muted-foreground mt-4">
             We'll never share your email. No spam, only updates.
           </p>
+
+          <div className="mt-8 pt-6 border-t border-border/40 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <span className="text-sm text-muted-foreground">Prefer instant hands-on?</span>
+            <DemoWalletButton variant="compact" />
+          </div>
         </div>
       </div>
     </section>

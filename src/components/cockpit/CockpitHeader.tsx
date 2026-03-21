@@ -1,25 +1,43 @@
 import { Bell, Menu } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useUIStore } from "@/store/useUIStore";
+import { Badge } from "@/components/ui/badge";
+import { useDemoStore } from "@/store/useDemoStore";
 
 export default function CockpitHeader() {
-  const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { toggleSidebar } = useUIStore();
+  const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 border-b border-border/30 bg-background/80 backdrop-blur-sm shrink-0 z-10">
-      <div className="flex items-center gap-3">
+    <header className="h-14 flex items-center justify-between px-4 border-b border-border/30 bg-background/80 backdrop-blur-md shrink-0 z-10">
+      <div className="flex items-center gap-3 min-w-0">
         <button
+          type="button"
           onClick={toggleSidebar}
           className="lg:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           <Menu size={18} />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-          <span className="text-xs text-muted-foreground">Testnet</span>
-        </div>
+        <Link to="/app" className="font-bold text-foreground truncate">
+          ClawGPT
+        </Link>
+        <Badge variant="secondary" className="hidden sm:inline-flex text-[10px] uppercase tracking-wide">
+          Testnet · 6 chains
+        </Badge>
+        {isDemoWalletConnected && (
+          <Badge
+            variant="outline"
+            className="text-[10px] text-amber-400 border-amber-500/40 bg-amber-500/10"
+          >
+            Demo wallet
+          </Badge>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <button className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative">
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+        >
           <Bell size={16} />
           <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full" />
         </button>

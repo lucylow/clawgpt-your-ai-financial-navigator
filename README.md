@@ -1,5 +1,4 @@
-
-# ClawGPT: Your AI Financial Navigator
+# ClawGPT Financial Cockpit
 
 [![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -9,11 +8,23 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-ClawGPT is an AI-powered financial cockpit for navigating multi-chain assets through a conversational interface. The repository combines a polished landing page, a protected authenticated cockpit, a 3D globe-based visual layer, live-style transaction telemetry, and a smart-contract folder for on-chain experimentation. The project is built with React, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Three Fiber, Supabase, and a modern routing/data stack.
+**ClawGPT Financial Cockpit** is a split-screen demo: **agent chat** (~40%) + **live dashboard** (~60%) with a 3D globe, portfolio metrics, charts, and ticker. Stack: **Vite, React, TypeScript, Tailwind, shadcn/ui, Zustand, R3F, Recharts, Supabase** (optional for the live agent).
+
+**Quick start:** `npm install` → copy `.env.example` to `.env` → `npm run dev` → open [http://localhost:8080](http://localhost:8080). **Mock agent** is the default for demos (`VITE_USE_MOCK_AGENT` — see `.env.example`).
+
+### 60-second demo (fully mocked UI)
+
+1. `npm install` and `npm run dev`
+2. Open `http://localhost:8080` and click **Use Demo Wallet** (no Supabase sign-in, no API keys)
+3. The cockpit loads a **mock 6-chain portfolio**; chat **show portfolio** and watch the dashboard and ticker
+
+**Docs:** [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+
+**Boundaries:** `src/lib/agentClient.ts` (`sendMessage`) · `src/lib/walletClient.ts` (WDK-ready stubs)
 
 ---
 
-## Table of contents
+## Table of contents (extended)
 
 1. [Vision](#vision)
 2. [What ClawGPT is designed to do](#what-clawgpt-is-designed-to-do)

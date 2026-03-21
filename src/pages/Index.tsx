@@ -1,4 +1,3 @@
-import GlobeScene from "@/components/GlobeScene";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import FeaturesSection from "@/components/FeaturesSection";
@@ -9,8 +8,7 @@ import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
-    <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
-      <GlobeScene />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#0A0F1F] text-[#F8FAFC]">
       <Navbar />
       <HeroSection />
       <FeaturesSection />

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
 
 interface Props {
   children: ReactNode;
@@ -17,7 +18,8 @@ export default function ProtectedRoute({ children }: Props) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
-      if (!session) {
+      const demo = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+      if (!session && !demo) {
         navigate("/auth", { replace: true });
       }
     });
@@ -25,7 +27,8 @@ export default function ProtectedRoute({ children }: Props) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      if (!session) {
+      const demo = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+      if (!session && !demo) {
         navigate("/auth", { replace: true });
       }
     });
@@ -41,7 +44,8 @@ export default function ProtectedRoute({ children }: Props) {
     );
   }
 
-  if (!session) return null;
+  const demoConnected = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+  if (!session && !demoConnected) return null;
 
   return <>{children}</>;
 }

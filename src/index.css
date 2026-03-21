@@ -6,8 +6,13 @@
 
 @layer base {
   :root {
-    --background: 220 50% 5%;
-    --foreground: 228 30% 92%;
+    /* Neon Crypto Terminal */
+    --neon-bg: 222 47% 8%;
+    --neon-surface: 222 26% 15%;
+    --neon-accent-start: 239 84% 67%;
+    --neon-accent-end: 258 90% 66%;
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
 
     --card: 220 40% 10%;
     --card-foreground: 228 30% 92%;
@@ -36,8 +41,8 @@
 
     --radius: 0.75rem;
 
-    --glass-bg: 220 40% 15%;
-    --glass-border: 220 60% 40%;
+    --glass-bg: 222 26% 15%;
+    --glass-border: 226 35% 35%;
     --glow: 204 100% 50%;
 
     --sidebar-background: 220 50% 5%;
@@ -67,6 +72,26 @@
     background: hsl(var(--glass-bg) / 0.4);
     backdrop-filter: blur(12px);
     border: 1px solid hsl(var(--glass-border) / 0.2);
+  }
+
+  .glass-card-neon {
+    background: rgba(26, 31, 46, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .glow-border-neon {
+    box-shadow:
+      0 0 0 1px rgba(99, 102, 241, 0.15),
+      0 24px 80px rgba(15, 23, 42, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .gradient-glow-cta {
+    box-shadow:
+      0 0 28px rgba(99, 102, 241, 0.35),
+      0 12px 40px rgba(15, 23, 42, 0.45);
   }
 
   .glass-card-hover {
@@ -102,6 +127,24 @@
   0% { transform: translateY(0px); }
   50% { transform: translateY(-20px); }
   100% { transform: translateY(0px); }
+}
+
+@keyframes ticker-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.ticker-marquee-track {
+  animation: ticker-marquee linear infinite;
+  transform: translateZ(0);
+}
+
+.ticker-marquee-wrap:hover .ticker-marquee-track {
+  animation-play-state: paused;
 }
 
 html {
