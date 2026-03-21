@@ -168,8 +168,9 @@ export default function ChatInterface() {
           asset: card.asset === "XAUt" ? "XAUt" : "USDt",
         });
         if (!res.ok) {
-          toast({ variant: "destructive", title: "Transfer failed", description: res.error });
-          appendAgentWorkflow("execute", `Failed: ${res.error}`);
+          const errMsg = (res as { error: string }).error;
+          toast({ variant: "destructive", title: "Transfer failed", description: errMsg });
+          appendAgentWorkflow("execute", `Failed: ${errMsg}`);
           return;
         }
         const tx: Transaction = {
