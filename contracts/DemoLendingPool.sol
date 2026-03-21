@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title DemoLendingPool
- * @dev Minimal lending pool for hackathon demonstration
+ * @dev Minimal USDT-style pool: deposits, simple time-based yield, owner-mediated loans with repayment.
+ *      Yield is not sourced from real revenue; fund the contract with stablecoins for demos.
+ *      Uses SafeERC20 for tokens that do not return bool on transfer (e.g. some USDT deployments).
  */
 contract DemoLendingPool is Ownable, ReentrancyGuard {
-    IERC20 public usdt;
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable asset;
 
     struct Deposit {
         uint256 amount;
@@ -19,20 +24,27 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
     }
 
     mapping(address => Deposit) public deposits;
+    /// @notice Outstanding principal owed by each borrower (owner-issued loans).
+    mapping(address => uint256) public borrowerDebt;
+
     uint256 public totalLiquidity;
-    uint256 public baseYieldRate = 500; // 5% in basis points
+    /// @notice Sum of outstanding loan principals (must be <= deposited liquidity notionally).
+    uint256 public totalOutstandingLoans;
+
+    uint256 public baseYieldRate = 500; // 5% APY in basis points (simplified linear accrual)
 
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount, uint256 yield_);
     event LoanIssued(address indexed borrower, uint256 amount, uint256 term);
+    event LoanRepaid(address indexed borrower, uint256 amount);
 
-    constructor(address _usdt) {
-        usdt = IERC20(_usdt);
+    constructor(address asset_) Ownable(msg.sender) {
+        asset = IERC20(asset_);
     }
 
     function deposit(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be > 0");
-        require(usdt.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        asset.safeTransferFrom(msg.sender, address(this), amount);
 
         Deposit storage userDeposit = deposits[msg.sender];
 
@@ -61,7 +73,7 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         totalLiquidity -= amount;
 
         uint256 totalToTransfer = amount + totalYield;
-        require(usdt.transfer(msg.sender, totalToTransfer), "Transfer failed");
+        asset.safeTransfer(msg.sender, totalToTransfer);
 
         emit Withdrawn(msg.sender, amount, totalYield);
     }
@@ -71,11 +83,31 @@ contract DemoLendingPool is Ownable, ReentrancyGuard {
         return (userDeposit.amount * baseYieldRate * timeHeld) / (365 days * 10000);
     }
 
-    function issueLoan(address borrower, uint256 amount, uint256 term) external onlyOwner {
+    /// @notice Owner pulls liquidity for an undercollateralized demo loan; borrower must later repay.
+    function issueLoan(address borrower, uint256 amount, uint256 term) external onlyOwner nonReentrant {
+        require(borrower != address(0), "Invalid borrower");
+        require(amount > 0, "Amount must be > 0");
         require(amount <= totalLiquidity, "Insufficient liquidity");
-        require(usdt.transfer(borrower, amount), "Transfer failed");
+
+        asset.safeTransfer(borrower, amount);
         totalLiquidity -= amount;
+        borrowerDebt[borrower] += amount;
+        totalOutstandingLoans += amount;
+
         emit LoanIssued(borrower, amount, term);
+    }
+
+    /// @notice Repay outstanding demo loan principal back into the pool.
+    function repayLoan(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be > 0");
+        require(borrowerDebt[msg.sender] >= amount, "Repayment exceeds debt");
+
+        asset.safeTransferFrom(msg.sender, address(this), amount);
+        borrowerDebt[msg.sender] -= amount;
+        totalOutstandingLoans -= amount;
+        totalLiquidity += amount;
+
+        emit LoanRepaid(msg.sender, amount);
     }
 
     function setYieldRate(uint256 newRate) external onlyOwner {

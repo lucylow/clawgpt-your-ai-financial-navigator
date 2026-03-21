@@ -16,6 +16,7 @@ import {
   SUPPORTED_WDK_CHAINS,
   type WdkChainId,
 } from "@/config/chains";
+import { TETHER_DECIMALS } from "@/config/tetherAssets";
 
 type EvmAccount = {
   getAddress: () => Promise<string>;
@@ -28,8 +29,8 @@ function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-function toUsd6(n: bigint): number {
-  return Number(n) / 1e6;
+function fromTetherRawUnits(n: bigint, decimals: number): number {
+  return Number(n) / 10 ** decimals;
 }
 
 function parseAssetAmount(amountStr: string, decimals = 6): bigint {
@@ -114,8 +115,8 @@ export class ClawWdkBridge {
         try {
           const raw = await evm.getTokenBalances(addrs);
           const [u, x] = evmPairBalances(raw, addrs.length);
-          if (tokens.USDt) balances.USDT = toUsd6(u);
-          if (tokens.XAUt) balances.XAUT = toUsd6(x);
+          if (tokens.USDt) balances.USDT = fromTetherRawUnits(u, TETHER_DECIMALS.USDt);
+          if (tokens.XAUt) balances.XAUT = fromTetherRawUnits(x, TETHER_DECIMALS.XAUt);
         } catch {
           balances.USDT = 0;
           balances.XAUT = 0;
@@ -134,12 +135,14 @@ export class ClawWdkBridge {
       const mints = getSolanaMints();
       const anyAcc = acc as unknown as { getTokenBalance?: (m: string) => Promise<bigint> };
       try {
-        if (mints.USDt && anyAcc.getTokenBalance) balances.USDT = toUsd6(await anyAcc.getTokenBalance(mints.USDt));
+        if (mints.USDt && anyAcc.getTokenBalance)
+          balances.USDT = fromTetherRawUnits(await anyAcc.getTokenBalance(mints.USDt), TETHER_DECIMALS.USDt);
       } catch {
         balances.USDT = 0;
       }
       try {
-        if (mints.XAUt && anyAcc.getTokenBalance) balances.XAUT = toUsd6(await anyAcc.getTokenBalance(mints.XAUt));
+        if (mints.XAUt && anyAcc.getTokenBalance)
+          balances.XAUT = fromTetherRawUnits(await anyAcc.getTokenBalance(mints.XAUt), TETHER_DECIMALS.XAUt);
       } catch {
         balances.XAUT = 0;
       }
@@ -150,12 +153,14 @@ export class ClawWdkBridge {
       const t = getTronTokenAddresses();
       const anyAcc = acc as unknown as { getTokenBalance?: (m: string) => Promise<bigint> };
       try {
-        if (t.USDt && anyAcc.getTokenBalance) balances.USDT = toUsd6(await anyAcc.getTokenBalance(t.USDt));
+        if (t.USDt && anyAcc.getTokenBalance)
+          balances.USDT = fromTetherRawUnits(await anyAcc.getTokenBalance(t.USDt), TETHER_DECIMALS.USDt);
       } catch {
         balances.USDT = 0;
       }
       try {
-        if (t.XAUt && anyAcc.getTokenBalance) balances.XAUT = toUsd6(await anyAcc.getTokenBalance(t.XAUt));
+        if (t.XAUt && anyAcc.getTokenBalance)
+          balances.XAUT = fromTetherRawUnits(await anyAcc.getTokenBalance(t.XAUt), TETHER_DECIMALS.XAUt);
       } catch {
         balances.XAUT = 0;
       }
@@ -165,12 +170,14 @@ export class ClawWdkBridge {
     const jet = getTonJettonMasters();
     const anyAcc = acc as unknown as { getTokenBalance?: (m: string) => Promise<bigint> };
     try {
-      if (jet.USDt && anyAcc.getTokenBalance) balances.USDT = toUsd6(await anyAcc.getTokenBalance(jet.USDt));
+      if (jet.USDt && anyAcc.getTokenBalance)
+        balances.USDT = fromTetherRawUnits(await anyAcc.getTokenBalance(jet.USDt), TETHER_DECIMALS.USDt);
     } catch {
       balances.USDT = 0;
     }
     try {
-      if (jet.XAUt && anyAcc.getTokenBalance) balances.XAUT = toUsd6(await anyAcc.getTokenBalance(jet.XAUt));
+      if (jet.XAUt && anyAcc.getTokenBalance)
+        balances.XAUT = fromTetherRawUnits(await anyAcc.getTokenBalance(jet.XAUt), TETHER_DECIMALS.XAUt);
     } catch {
       balances.XAUT = 0;
     }
@@ -244,7 +251,7 @@ export class ClawWdkBridge {
       const token = asset === "USDt" ? tokens.USDt : tokens.XAUt;
       if (!token) throw new Error(`Set VITE token env for ${chain} ${asset}`);
       const acc = (await this.wdk.getAccount(chain, 0)) as unknown as EvmAccount;
-      const amt = parseAssetAmount(amount, 6);
+      const amt = parseAssetAmount(amount, TETHER_DECIMALS[asset]);
       const res = await acc.transfer({ token, recipient: to, amount: amt });
       return { hash: res.hash, status: "pending" };
     }

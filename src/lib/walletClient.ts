@@ -8,6 +8,7 @@
 import type { WdkChainId } from "@/config/chains";
 import { SUPPORTED_WDK_CHAINS } from "@/config/chains";
 import { DEMO_SESSION_KEY, WALLET_MODE_KEY, WDK_SEED_SESSION_KEY } from "@/lib/demoWallet";
+import type { UserConfirmedChainIntent } from "@/lib/securityModel";
 import { getQueryClient } from "@/lib/queryClientSingleton";
 import { queryKeys } from "@/lib/queryKeys";
 import { usePortfolioStore } from "@/store/usePortfolioStore";

@@ -33,9 +33,9 @@ const CHAIN_CONFIGS: Record<string, any> = {
       uniswap: { router: "0xE592427A0AEce92De3Edee1F18E0157C05861564", factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984" },
     },
   },
-  solana: { name: "Solana", chainId: 101, gasAvgUsd: 0.002, tokens: { USDt: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", XAUt: "7dHbWXmci3dT8UFYWYZweBLjgyA8t8UjgNQwPc8hGj9V" }, protocols: {} },
+  solana: { name: "Solana", chainId: 101, gasAvgUsd: 0.002, tokens: { USDt: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", XAUt: "AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P" }, protocols: {} },
   tron: { name: "Tron", chainId: 728126428, gasAvgUsd: 1.1, tokens: { USDt: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", XAUt: "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj" }, protocols: {} },
-  ton: { name: "TON", chainId: 0, gasAvgUsd: 0.05, tokens: { USDt: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs" }, protocols: {} },
+  ton: { name: "TON", chainId: 0, gasAvgUsd: 0.05, tokens: { USDt: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs", XAUt: "EQA1R_LuQCLHlMgOo1S4G7Y7W1cd0FrAkbA10Zq7rddKxi9k" }, protocols: {} },
 };
 
 // ── Economic guardrails ──────────────────────────────────────────────────────
@@ -246,6 +246,101 @@ const tools = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "summarize_portfolio_movements",
+      description:
+        "Summarize how the portfolio changed over a recent window (flows, sleeve drift, notable chain shifts). Use when the user asks about activity, P&L-style movement, or 'what changed'.",
+      parameters: {
+        type: "object",
+        properties: {
+          period_days: { type: "number", description: "Lookback window in days (default 7)" },
+          focus: {
+            type: "string",
+            enum: ["all", "usd_t", "xaut"],
+            description: "Whether to emphasize USDt liquidity, XAUt hedge, or both",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_rebalancing",
+      description:
+        "Suggest concrete trades/bridges to move toward a target USDt vs XAUt allocation while respecting guardrails. Use when the user asks to rebalance, fix drift, or adjust sleeve weights.",
+      parameters: {
+        type: "object",
+        properties: {
+          target_usdt_pct: {
+            type: "number",
+            description: "Target share of NAV in USDt (0–100). Remainder is XAUt hedge sleeve.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "draft_transaction_plan",
+      description:
+        "Draft a numbered, step-by-step transaction plan (approvals, bridge, swap, deposit) with estimated gas per step. Use when the user wants a plan, checklist, or staged execution.",
+      parameters: {
+        type: "object",
+        properties: {
+          goal: {
+            type: "string",
+            enum: ["consolidate_to_l2", "increase_yield", "raise_hedge", "custom_bridge"],
+            description: "High-level objective shaping default steps",
+          },
+          primary_chain: { type: "string", enum: Object.keys(CHAIN_CONFIGS), description: "Main working chain for the plan" },
+          amount_usd: { type: "number", description: "Notional USD for the plan" },
+          asset: { type: "string", enum: ["USDt", "XAUt"] },
+        },
+        required: ["goal"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "explain_gas_costs",
+      description:
+        "Explain what drives gas for a chain and operation, and how it relates to transaction size. Use when the user asks why gas is high, what L2 saves, or gas vs amount.",
+      parameters: {
+        type: "object",
+        properties: {
+          chain: { type: "string", enum: Object.keys(CHAIN_CONFIGS) },
+          operation: { type: "string", enum: ["transfer", "swap", "bridge", "deposit"] },
+          amount_usd: { type: "number", description: "Optional notional to compare gas as % of size" },
+        },
+        required: ["chain", "operation"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_chain_routes",
+      description:
+        "Compare bridge or execution routes between two chains for an asset and amount (cost, hops, ETA). Use when the user asks which chain/route is cheaper or faster.",
+      parameters: {
+        type: "object",
+        properties: {
+          from_chain: { type: "string", enum: Object.keys(CHAIN_CONFIGS) },
+          to_chain: { type: "string", enum: Object.keys(CHAIN_CONFIGS) },
+          asset: { type: "string", enum: ["USDt", "XAUt"] },
+          amount: { type: "number" },
+        },
+        required: ["from_chain", "to_chain", "asset", "amount"],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ───────────────────────────────────────────────────────────
@@ -259,8 +354,60 @@ const DEMO_PORTFOLIO: Record<string, { USDt: number; XAUt: number }> = {
   ton: { USDt: 200, XAUt: 0 },
 };
 
+/** Synthetic 7d-ago snapshot for movement summaries (demo). */
+const PORTFOLIO_7D_AGO: Record<string, { USDt: number; XAUt: number }> = {
+  ethereum: { USDt: 3050, XAUt: 1980 },
+  polygon: { USDt: 1980, XAUt: 980 },
+  arbitrum: { USDt: 1400, XAUt: 480 },
+  solana: { USDt: 1150, XAUt: 0 },
+  tron: { USDt: 520, XAUt: 0 },
+  ton: { USDt: 180, XAUt: 0 },
+};
+
 function getPortfolioTotal(): number {
   return Object.values(DEMO_PORTFOLIO).reduce((s, v) => s + v.USDt + v.XAUt, 0);
+}
+
+function chainPairKey(a: string, b: string): string {
+  return [a, b].sort().join("::");
+}
+
+type RouteMeta = { label: string; etaHours: string; relayUsd: number; hops: number; notes: string };
+
+const ROUTE_META_BY_PAIR: Record<string, RouteMeta> = {
+  [chainPairKey("ethereum", "arbitrum")]: {
+    label: "Canonical rollup bridge",
+    etaHours: "~12–24h (challenge window on full exit)",
+    relayUsd: 2.5,
+    hops: 1,
+    notes: "High L1 gas on deposit; cheap L2 execution after.",
+  },
+  [chainPairKey("ethereum", "polygon")]: {
+    label: "PoS bridge / official",
+    etaHours: "~20–60m typical",
+    relayUsd: 1.8,
+    hops: 1,
+    notes: "Popular path; check token mapping for USDt.",
+  },
+  [chainPairKey("polygon", "arbitrum")]: {
+    label: "L2 ↔ L2 (via Ethereum or liquidity route)",
+    etaHours: "~30m–3h",
+    relayUsd: 3.2,
+    hops: 2,
+    notes: "Often routed through Ethereum L1 or shared liquidity; compare fees.",
+  },
+};
+
+const ROUTE_META_FALLBACK: RouteMeta = {
+  label: "Generic bridge path",
+  etaHours: "~20m–24h (route-dependent)",
+  relayUsd: 3.0,
+  hops: 2,
+  notes: "Compare estimates below; always verify token contracts and bridge UI.",
+};
+
+function getRouteMeta(from: string, to: string): RouteMeta {
+  return ROUTE_META_BY_PAIR[chainPairKey(from, to)] ?? ROUTE_META_FALLBACK;
 }
 
 function executeTool(name: string, args: Record<string, any>): {

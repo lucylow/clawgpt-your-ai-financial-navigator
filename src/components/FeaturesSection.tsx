@@ -4,7 +4,8 @@ const features = [
   {
     icon: MessageSquare,
     title: "Conversational AI",
-    description: 'Just type "Send 50 USDt to Mike" – Claw handles the rest.',
+    description:
+      'Ask in plain language — Claw proposes a plan or a ready-to-send card; you confirm before any state changes.',
   },
   {
     icon: Globe,
@@ -25,7 +26,7 @@ const features = [
 
 export default function FeaturesSection() {
   return (
-    <section id="features" className="relative py-24 px-4">
+    <section id="features" className="relative scroll-mt-24 py-24 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <span className="text-xs font-semibold tracking-widest uppercase text-primary mb-3 block">

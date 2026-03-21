@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { COCKPIT_APP_BASE } from "@/config/routes";
 import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
+import { isBrowseSessionActive } from "@/lib/cockpitAccess";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
@@ -9,8 +11,8 @@ interface Props {
 }
 
 /**
- * Requires Supabase session, or (unless VITE_REQUIRE_AUTH_FOR_APP=true) a demo wallet session flag.
- * Unauthenticated users are sent to /auth?redirect=… for post-login return.
+ * Cockpit guard: Supabase session, or (unless `VITE_REQUIRE_AUTH_FOR_APP=true`) demo wallet or browse flag.
+ * Unauthenticated users are sent to `/auth?redirect=…` for post-login return.
  */
 export default function ProtectedRoute({ children }: Props) {
   const { session, loading } = useAuth();
@@ -22,10 +24,11 @@ export default function ProtectedRoute({ children }: Props) {
     if (loading) return;
     const demo =
       typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
-    const allowDemoBypass = !requireAuthOnly && demo;
-    if (session || allowDemoBypass) return;
+    const browse = isBrowseSessionActive();
+    const allowDevBypass = !requireAuthOnly && (demo || browse);
+    if (session || allowDevBypass) return;
     const next = `${location.pathname}${location.search}`;
-    const redirect = encodeURIComponent(next.startsWith("/") ? next : "/app");
+    const redirect = encodeURIComponent(next.startsWith("/") ? next : COCKPIT_APP_BASE);
     navigate(`/auth?redirect=${redirect}`, { replace: true });
   }, [session, loading, navigate, location.pathname, location.search, requireAuthOnly]);
 
@@ -39,8 +42,9 @@ export default function ProtectedRoute({ children }: Props) {
 
   const demoConnected =
     typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
-  const allowDemoBypass = !requireAuthOnly && demoConnected;
-  if (!session && !allowDemoBypass) return null;
+  const browseOnly = isBrowseSessionActive();
+  const allowDevBypass = !requireAuthOnly && (demoConnected || browseOnly);
+  if (!session && !allowDevBypass) return null;
 
   return <>{children}</>;
 }

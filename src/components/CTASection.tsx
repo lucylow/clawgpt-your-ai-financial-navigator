@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import DemoWalletButton from "@/components/DemoWalletButton";
 
 export default function CTASection() {
@@ -11,14 +12,24 @@ export default function CTASection() {
   };
 
   return (
-    <section id="waitlist" className="relative py-24 px-4">
+    <section id="waitlist" className="relative scroll-mt-24 py-24 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <div className="glass-card glow-border rounded-2xl p-10 md:p-14">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to take control?</h2>
           <p className="text-muted-foreground mb-8">
-            Join the waitlist for early access to ClawGPT and be among the first to experience
-            AI-powered self-custodial finance.
+            Sign in for a synced cockpit session, launch the demo wallet for instant exploration, or join the waitlist for
+            product updates.
           </p>
+
+          <div className="mb-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[48px] items-center justify-center rounded-lg border border-primary/40 bg-primary/15 px-6 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/25"
+            >
+              Sign in to cockpit
+            </Link>
+            <DemoWalletButton variant="compact" className="min-h-[48px] justify-center sm:min-w-[200px]" />
+          </div>
 
           {submitted ? (
             <p className="text-primary font-semibold">🎉 You're on the list! We'll be in touch.</p>
@@ -44,11 +55,6 @@ export default function CTASection() {
           <p className="text-xs text-muted-foreground mt-4">
             We'll never share your email. No spam, only updates.
           </p>
-
-          <div className="mt-8 pt-6 border-t border-border/40 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <span className="text-sm text-muted-foreground">Prefer instant hands-on?</span>
-            <DemoWalletButton variant="compact" />
-          </div>
         </div>
       </div>
     </section>

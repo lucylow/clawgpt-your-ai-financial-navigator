@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
  * @title AccessNFT
- * @dev ERC721 token representing access rights to private AI files
+ * @dev ERC-721 membership / gate: metadata URI + optional expiry per token.
+ *      Intended as an extensible hook for gated product features (cockpit, agent tools, etc.).
+ *      Replace deprecated Counters with a simple counter (OpenZeppelin v5+).
  */
 contract AccessNFT is ERC721URIStorage, Ownable {
-    using Counters for Counters.Counter;
-    Counters.Counter private _tokenIds;
+    uint256 private _nextTokenId;
 
     mapping(uint256 => string) public fileTypes;
     mapping(uint256 => uint256) public expirationTimestamps;
@@ -23,53 +23,68 @@ contract AccessNFT is ERC721URIStorage, Ownable {
 
     function mint(
         address to,
-        string calldata tokenURI,
-        string calldata fileType,
+        string calldata tokenURI_,
+        string calldata fileType_,
         uint256 expiration
     ) external onlyOwner returns (uint256) {
-        _tokenIds.increment();
-        uint256 newTokenId = _tokenIds.current();
+        _nextTokenId++;
+        uint256 newTokenId = _nextTokenId;
 
         _safeMint(to, newTokenId);
-        _setTokenURI(newTokenId, tokenURI);
+        _setTokenURI(newTokenId, tokenURI_);
 
-        fileTypes[newTokenId] = fileType;
+        fileTypes[newTokenId] = fileType_;
         expirationTimestamps[newTokenId] = expiration;
 
-        emit NFTCreated(to, newTokenId, fileType, tokenURI);
+        emit NFTCreated(to, newTokenId, fileType_, tokenURI_);
         return newTokenId;
     }
 
     function batchMint(
         address[] calldata recipients,
         string[] calldata tokenURIs,
-        string[] calldata _fileTypes,
+        string[] calldata fileTypes_,
         uint256[] calldata expirations
     ) external onlyOwner returns (uint256[] memory) {
-        require(recipients.length == tokenURIs.length, "Length mismatch");
-        require(recipients.length == _fileTypes.length, "Length mismatch");
-        require(recipients.length == expirations.length, "Length mismatch");
+        require(
+            recipients.length == tokenURIs.length &&
+                recipients.length == fileTypes_.length &&
+                recipients.length == expirations.length,
+            "Length mismatch"
+        );
 
         uint256[] memory tokenIds = new uint256[](recipients.length);
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            _tokenIds.increment();
-            uint256 newTokenId = _tokenIds.current();
+            _nextTokenId++;
+            uint256 newTokenId = _nextTokenId;
             _safeMint(recipients[i], newTokenId);
             _setTokenURI(newTokenId, tokenURIs[i]);
-            fileTypes[newTokenId] = _fileTypes[i];
+            fileTypes[newTokenId] = fileTypes_[i];
             expirationTimestamps[newTokenId] = expirations[i];
-            emit NFTCreated(recipients[i], newTokenId, _fileTypes[i], tokenURIs[i]);
+            emit NFTCreated(recipients[i], newTokenId, fileTypes_[i], tokenURIs[i]);
             tokenIds[i] = newTokenId;
         }
 
         return tokenIds;
     }
 
+    /// @notice Whether the token exists and is not past its expiry (0 = no expiry).
     function isValid(uint256 tokenId) external view returns (bool) {
         require(_ownerOf(tokenId) != address(0), "Token does not exist");
         uint256 expiration = expirationTimestamps[tokenId];
         return expiration == 0 || block.timestamp < expiration;
+    }
+
+    /// @notice True if `account` holds at least one non-expired token (O(supply) scan; fine for demos).
+    function hasAccess(address account) external view returns (bool) {
+        uint256 n = _nextTokenId;
+        for (uint256 i = 1; i <= n; i++) {
+            if (_ownerOf(i) != account) continue;
+            uint256 exp = expirationTimestamps[i];
+            if (exp == 0 || block.timestamp < exp) return true;
+        }
+        return false;
     }
 
     function setExpiration(uint256 tokenId, uint256 expiration) external onlyOwner {
@@ -82,9 +97,9 @@ contract AccessNFT is ERC721URIStorage, Ownable {
         uint256 balance = balanceOf(owner);
         uint256[] memory tokens = new uint256[](balance);
         uint256 index = 0;
-        uint256 totalSupply = _tokenIds.current();
+        uint256 totalMinted = _nextTokenId;
 
-        for (uint256 i = 1; i <= totalSupply; i++) {
+        for (uint256 i = 1; i <= totalMinted; i++) {
             if (_ownerOf(i) == owner) {
                 tokens[index] = i;
                 index++;
