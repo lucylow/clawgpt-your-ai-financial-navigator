@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -44,6 +47,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
+    "@solana/kit": "^4.0.0",
     "@supabase/supabase-js": "^2.99.1",
     "@tetherto/wdk": "^1.0.0-beta.6",
     "@tetherto/wdk-wallet-evm": "^1.0.0-beta.10",
@@ -51,6 +55,7 @@
     "@tetherto/wdk-wallet-ton": "^1.0.0-beta.7",
     "@tetherto/wdk-wallet-tron": "^1.0.0-beta.4",
     "@tanstack/react-query": "^5.83.0",
+    "@ton/core": "^0.59.0",
     "braces": "3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

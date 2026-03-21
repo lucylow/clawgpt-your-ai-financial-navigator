@@ -5,7 +5,9 @@
  */
 export function getRouterBasename(): string | undefined {
   const base = import.meta.env.BASE_URL;
-  if (base === "/" || base === "") return undefined;
+  // Root or relative asset base (`./`) — no router basename (matches Lovable / Vite defaults).
+  if (base === "/" || base === "" || base === "./") return undefined;
   const trimmed = base.replace(/\/$/, "");
+  if (trimmed === "." || trimmed === "") return undefined;
   return trimmed.length > 0 ? trimmed : undefined;
 }

@@ -2,7 +2,7 @@
   "name": "ClawGPT Financial Cockpit",
   "short_name": "ClawGPT",
   "description": "Multi-chain AI cockpit for USDt, XAUt, and Tether WDK testnets.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",

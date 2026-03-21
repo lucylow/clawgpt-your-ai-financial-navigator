@@ -1,15 +1,38 @@
 /**
  * Wallet boundary — Tether WDK behind a stable facade. UI and stores call these helpers;
  * swap implementations here without changing component trees.
+ *
+ * WDK packages are loaded asynchronously so the public landing route does not evaluate
+ * heavy native/crypto stacks (avoids blank pages on Lovable and similar previews).
  */
-import WDK from "@tetherto/wdk";
 import type { WdkChainId } from "@/config/chains";
 import { SUPPORTED_WDK_CHAINS } from "@/config/chains";
 import { DEMO_SESSION_KEY, WALLET_MODE_KEY, WDK_SEED_SESSION_KEY } from "@/lib/demoWallet";
-import { clawWdk } from "@/lib/wdkClient";
 import { getQueryClient } from "@/lib/queryClientSingleton";
 import { queryKeys } from "@/lib/queryKeys";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
+
+type WdkModule = typeof import("@/lib/wdkClient");
+
+let wdkModulePromise: Promise<WdkModule> | null = null;
+let wdkModuleCache: WdkModule | null = null;
+
+async function loadWdkModule(): Promise<WdkModule> {
+  if (wdkModuleCache) return wdkModuleCache;
+  if (!wdkModulePromise) {
+    wdkModulePromise = import("@/lib/wdkClient")
+      .then((m) => {
+        wdkModuleCache = m;
+        return m;
+      })
+      .catch((e) => {
+        wdkModulePromise = null;
+        const detail = e instanceof Error ? e.message : String(e);
+        throw new Error(`Wallet SDK failed to load: ${detail}`);
+      });
+  }
+  return wdkModulePromise;
+}
 
 export interface SendTransactionParams {
   chain: string;
@@ -48,11 +71,16 @@ export function getWalletMode(): "wdk" | "demo" {
 }
 
 export function isRealWdkSession(): boolean {
-  return readWalletMode() === "wdk" && clawWdk.isReady();
+  if (readWalletMode() !== "wdk") return false;
+  return wdkModuleCache?.clawWdk.isReady() ?? false;
 }
 
 export function disconnectWalletSession(): void {
-  clawWdk.disconnect();
+  if (wdkModuleCache) {
+    wdkModuleCache.clawWdk.disconnect();
+  } else if (wdkModulePromise) {
+    void wdkModulePromise.then((m) => m.clawWdk.disconnect());
+  }
   try {
     sessionStorage.removeItem(WDK_SEED_SESSION_KEY);
     sessionStorage.removeItem(WALLET_MODE_KEY);
@@ -69,6 +97,7 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
     return { success: false, error: "WDK disabled (VITE_USE_WDK=false)" };
   }
   try {
+    const [{ clawWdk }, { default: WDK }] = await Promise.all([loadWdkModule(), import("@tetherto/wdk")]);
     const phrase =
       seedOverride ??
       (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WDK_SEED_SESSION_KEY) : null) ??
@@ -99,7 +128,9 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
 }
 
 export async function refreshLivePortfolio(): Promise<void> {
-  if (!isRealWdkSession()) return;
+  if (readWalletMode() !== "wdk") return;
+  const { clawWdk } = await loadWdkModule();
+  if (!clawWdk.isReady()) return;
   try {
     const snap = await clawWdk.buildPortfolioSnapshot();
     usePortfolioStore.getState().hydrateDemoPortfolio(snap);
@@ -113,9 +144,14 @@ export async function refreshLivePortfolio(): Promise<void> {
 }
 
 export async function createWallet(): Promise<{ address: string; chain: string }> {
-  if (clawWdk.isReady()) {
-    const address = await clawWdk.getPrimaryAddress();
-    return { address, chain: "ethereum" };
+  try {
+    const { clawWdk } = await loadWdkModule();
+    if (clawWdk.isReady()) {
+      const address = await clawWdk.getPrimaryAddress();
+      return { address, chain: "ethereum" };
+    }
+  } catch {
+    /* fallback when WDK is unavailable or not ready */
   }
   return {
     address: "0x" + "demo".padStart(40, "0"),
@@ -124,6 +160,7 @@ export async function createWallet(): Promise<{ address: string; chain: string }
 }
 
 export async function getBalances(queries: BalanceQuery[]): Promise<Record<string, number>> {
+  const { clawWdk } = await loadWdkModule();
   if (!clawWdk.isReady()) {
     return Object.fromEntries(queries.map((q) => [`${q.chain}:${q.address}`, 0]));
   }
@@ -160,6 +197,7 @@ export async function sendTransaction(params: SendTransactionParams): Promise<Se
   if (!Number.isFinite(amt) || amt <= 0) {
     return { ok: false, error: "Invalid amount.", code: "VALIDATION" };
   }
+  const { clawWdk } = await loadWdkModule();
   if (!clawWdk.isReady()) {
     return {
       ok: false,
@@ -207,9 +245,16 @@ export async function restoreSessionIfNeeded(): Promise<void> {
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
     if (!connected || mode !== "wdk" || !seed) return;
     const r = await connectDemoWallet(seed);
-    if (!r.success) return;
+    if (!r.success) {
+      const msg = r.error?.trim()
+        ? `Session restore: ${r.error}`
+        : "Could not restore wallet session after reload.";
+      usePortfolioStore.getState().setPortfolioSyncError(msg);
+      return;
+    }
     await refreshLivePortfolio();
-  } catch {
-    /* ignore */
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Session restore failed.";
+    usePortfolioStore.getState().setPortfolioSyncError(msg);
   }
 }

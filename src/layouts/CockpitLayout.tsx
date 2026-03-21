@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
@@ -9,7 +10,6 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import { useDemoModeEffects } from "@/hooks/useDemoModeEffects";
 import { useDemoStore } from "@/store/useDemoStore";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
-import { restoreSessionIfNeeded } from "@/lib/walletClient";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 
@@ -22,7 +22,12 @@ export default function CockpitLayout() {
     const mode =
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
     if (mode === "wdk") {
-      void restoreSessionIfNeeded();
+      void import("@/lib/walletClient")
+        .then(({ restoreSessionIfNeeded }) => restoreSessionIfNeeded())
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          usePortfolioStore.getState().setPortfolioSyncError(`Wallet: ${msg}`);
+        });
       return;
     }
     usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
@@ -40,7 +45,15 @@ export default function CockpitLayout() {
         <CockpitHeader />
         <main className="flex-1 overflow-hidden pb-[5.5rem] md:pb-0">
           <WalletErrorBoundary>
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center p-8" role="status">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading page" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </WalletErrorBoundary>
         </main>
         <MobileBottomNav />

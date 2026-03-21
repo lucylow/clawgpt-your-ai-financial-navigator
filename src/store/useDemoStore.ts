@@ -4,11 +4,6 @@ import {
   WALLET_MODE_KEY,
 } from "@/lib/demoWallet";
 import { getDemoPortfolioSnapshot, randomMockTransaction } from "@/lib/mockData";
-import {
-  connectDemoWallet as connectWdkSession,
-  disconnectWalletSession,
-  refreshLivePortfolio,
-} from "@/lib/walletClient";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import type { NestedAllocation } from "@/types";
 
@@ -40,18 +35,63 @@ function readWalletMode(): "demo" | "wdk" {
   }
 }
 
+function safeSessionSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function safeLocalSet(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeLocalRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 export const useDemoStore = create<DemoState>((set, get) => ({
   isDemoWalletConnected: readDemo(),
   walletMode: readWalletMode(),
 
   connectDemoWallet: async () => {
     if (import.meta.env.VITE_USE_WDK === "false") {
-      localStorage.setItem(DEMO_SESSION_KEY, "1");
-      try {
-        sessionStorage.setItem(WALLET_MODE_KEY, "demo");
-      } catch {
-        /* ignore */
+      if (!safeLocalSet(DEMO_SESSION_KEY, "1")) {
+        usePortfolioStore
+          .getState()
+          .setPortfolioSyncError("Could not save session (storage blocked or full). Demo data is in-memory only.");
       }
+      safeSessionSet(WALLET_MODE_KEY, "demo");
+      set({ isDemoWalletConnected: true, walletMode: "demo" });
+      usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
+      return;
+    }
+
+    let connectWdkSession: typeof import("@/lib/walletClient").connectDemoWallet;
+    let refreshLivePortfolio: typeof import("@/lib/walletClient").refreshLivePortfolio;
+    try {
+      const mod = await import("@/lib/walletClient");
+      connectWdkSession = mod.connectDemoWallet;
+      refreshLivePortfolio = mod.refreshLivePortfolio;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const persisted = safeLocalSet(DEMO_SESSION_KEY, "1");
+      usePortfolioStore.getState().setPortfolioSyncError(
+        !persisted
+          ? `Wallet module failed to load: ${msg} Session storage unavailable.`
+          : `Wallet module failed to load: ${msg}`,
+      );
+      safeSessionSet(WALLET_MODE_KEY, "demo");
       set({ isDemoWalletConnected: true, walletMode: "demo" });
       usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
       return;
@@ -59,51 +99,49 @@ export const useDemoStore = create<DemoState>((set, get) => ({
 
     const result = await connectWdkSession();
     if (result.success) {
-      localStorage.setItem(DEMO_SESSION_KEY, "1");
+      if (!safeLocalSet(DEMO_SESSION_KEY, "1")) {
+        usePortfolioStore
+          .getState()
+          .setPortfolioSyncError("Connected, but session could not be persisted (storage blocked or full).");
+      }
       set({ isDemoWalletConnected: true, walletMode: "wdk" });
       try {
         await refreshLivePortfolio();
       } catch {
-        try {
-          sessionStorage.setItem(WALLET_MODE_KEY, "demo");
-        } catch {
-          /* ignore */
-        }
+        safeSessionSet(WALLET_MODE_KEY, "demo");
         set({ walletMode: "demo" });
         usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
       }
       return;
     }
 
-    localStorage.setItem(DEMO_SESSION_KEY, "1");
-    try {
-      sessionStorage.setItem(WALLET_MODE_KEY, "demo");
-    } catch {
-      /* ignore */
-    }
+    const errDetail = result.error?.trim();
+    const persisted = safeLocalSet(DEMO_SESSION_KEY, "1");
+    usePortfolioStore.getState().setPortfolioSyncError(
+      !persisted
+        ? errDetail
+          ? `Live wallet: ${errDetail}. Demo portfolio active; session not saved (storage blocked).`
+          : "Live wallet unavailable. Demo portfolio active; session not saved (storage blocked)."
+        : errDetail
+          ? `Live wallet: ${errDetail}. Using demo portfolio.`
+          : "Live wallet unavailable. Using demo portfolio.",
+    );
+    safeSessionSet(WALLET_MODE_KEY, "demo");
     set({ isDemoWalletConnected: true, walletMode: "demo" });
     usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
   },
 
   disconnectDemoWallet: () => {
-    disconnectWalletSession();
-    localStorage.removeItem(DEMO_SESSION_KEY);
-    try {
-      sessionStorage.setItem(WALLET_MODE_KEY, "demo");
-    } catch {
-      /* ignore */
-    }
+    void import("@/lib/walletClient").then(({ disconnectWalletSession }) => disconnectWalletSession());
+    safeLocalRemove(DEMO_SESSION_KEY);
+    safeSessionSet(WALLET_MODE_KEY, "demo");
     set({ isDemoWalletConnected: false, walletMode: "demo" });
   },
 
   enterDemoMode: () => {
-    disconnectWalletSession();
-    try {
-      sessionStorage.setItem(WALLET_MODE_KEY, "demo");
-    } catch {
-      /* ignore */
-    }
-    localStorage.setItem(DEMO_SESSION_KEY, "1");
+    void import("@/lib/walletClient").then(({ disconnectWalletSession }) => disconnectWalletSession());
+    safeSessionSet(WALLET_MODE_KEY, "demo");
+    safeLocalSet(DEMO_SESSION_KEY, "1");
     set({ isDemoWalletConnected: true, walletMode: "demo" });
     usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
     usePortfolioStore.getState().setPortfolioSyncError(null);
@@ -112,9 +150,11 @@ export const useDemoStore = create<DemoState>((set, get) => ({
   refreshPortfolio: () => {
     if (!get().isDemoWalletConnected) return;
     if (get().walletMode === "wdk") {
-      void refreshLivePortfolio().catch(() => {
-        /* error already recorded on store */
-      });
+      void import("@/lib/walletClient").then(({ refreshLivePortfolio }) =>
+        refreshLivePortfolio().catch(() => {
+          /* error already recorded on store */
+        }),
+      );
       return;
     }
     const p = usePortfolioStore.getState();
