@@ -1,3 +1,4 @@
+import { isSupabaseConfigured, supabaseEnvKey, supabaseEnvUrl } from "@/lib/supabaseEnv";
 import { loadConversation, saveChatMessage as persistChatMessage } from "@/services/chatMessages.service";
 
 export interface AgentMetadata {
@@ -42,13 +43,13 @@ export async function streamAgentMessage({
     return;
   }
 
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-  if (!baseUrl || !anonKey) {
+  if (!isSupabaseConfigured) {
     onError("Chat is not configured (missing Supabase URL or key).");
     return;
   }
 
+  const baseUrl = supabaseEnvUrl ?? "";
+  const anonKey = supabaseEnvKey ?? "";
   const url = `${baseUrl.replace(/\/$/, "")}/functions/v1/agent-chat`;
 
   try {

@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Optional public path when the app is not served at domain root (read in vite.config only). */
+  readonly VITE_BASE_PATH?: string;
   readonly VITE_USE_MOCK_AGENT?: string;
   /** When true, demo wallet bypass is disabled for /app — Supabase session required. */
   readonly VITE_REQUIRE_AUTH_FOR_APP?: string;

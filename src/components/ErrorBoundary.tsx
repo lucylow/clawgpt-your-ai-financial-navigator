@@ -27,9 +27,26 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
+      const err = this.state.error;
       return (
-        <div className="flex items-center justify-center p-6 text-sm text-muted-foreground" role="alert">
-          <p>Something went wrong. Please refresh.</p>
+        <div
+          className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 p-6 text-sm"
+          style={{
+            fontFamily: "system-ui, sans-serif",
+            background: "#0A0F1F",
+            color: "#e2e8f0",
+          }}
+          role="alert"
+        >
+          <p className="max-w-md text-center">Something went wrong. Try a hard refresh.</p>
+          {import.meta.env.DEV && err ? (
+            <pre
+              className="max-h-48 max-w-full overflow-auto rounded-md border border-white/10 bg-black/30 p-3 text-left text-xs text-red-300"
+              style={{ wordBreak: "break-word" }}
+            >
+              {err.message}
+            </pre>
+          ) : null}
         </div>
       );
     }
