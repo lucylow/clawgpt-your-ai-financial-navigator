@@ -13,6 +13,9 @@ import ObservabilityRouteListener from "@/components/ObservabilityRouteListener"
 import Index from "./pages/Index.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import AboutPage from "./pages/AboutPage.tsx";
+import PrivacyPage from "./pages/PrivacyPage.tsx";
+import TermsPage from "./pages/TermsPage.tsx";
 
 /** Code-split the cockpit so Tether WDK + heavy deps are not evaluated on the public landing route (fixes blank Lovable preview). */
 const CockpitLayout = lazy(() => import("./layouts/CockpitLayout.tsx"));
@@ -24,6 +27,7 @@ const SettingsPage = lazy(() => import("./pages/cockpit/SettingsPage.tsx"));
 const HelpPage = lazy(() => import("./pages/cockpit/HelpPage.tsx"));
 const NFTsPage = lazy(() => import("./pages/cockpit/NFTsPage.tsx"));
 const ChatPage = lazy(() => import("./pages/cockpit/ChatPage.tsx"));
+const MarketsPage = lazy(() => import("./pages/cockpit/MarketsPage.tsx"));
 
 function CockpitFallback() {
   return (
@@ -56,6 +60,9 @@ function App() {
             <ObservabilityRouteListener />
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route
                 path="/app"
@@ -69,6 +76,7 @@ function App() {
               >
                 <Route index element={<DashboardPage />} />
                 <Route path="portfolio" element={<PortfolioPage />} />
+                <Route path="markets" element={<MarketsPage />} />
                 <Route path="transactions" element={<TransactionsPage />} />
                 <Route path="wallets" element={<WalletsPage />} />
                 <Route path="nfts" element={<NFTsPage />} />

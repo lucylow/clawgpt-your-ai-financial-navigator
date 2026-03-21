@@ -15,4 +15,13 @@ test.describe("Public landing and auth redirect", () => {
     await page.goto("/this-route-does-not-exist-12345");
     await expect(page.getByText(/not found|404/i)).toBeVisible({ timeout: 10_000 });
   });
+
+  test("marketing subpages load", async ({ page }) => {
+    await page.goto("/about");
+    await expect(page.getByRole("heading", { name: /about clawgpt/i })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/privacy");
+    await expect(page.getByRole("heading", { name: /privacy policy/i })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/terms");
+    await expect(page.getByRole("heading", { name: /terms of service/i })).toBeVisible({ timeout: 10_000 });
+  });
 });

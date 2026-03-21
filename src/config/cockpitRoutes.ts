@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   PieChart,
+  TrendingUp,
   History,
   Wallet,
   Image,
@@ -27,6 +28,10 @@ export const COCKPIT_ROUTE_META: Record<
   "/app/portfolio": {
     title: "Portfolio",
     description: "Holdings and allocation detail",
+  },
+  "/app/markets": {
+    title: "Markets",
+    description: "Reference prices and moves",
   },
   "/app/transactions": {
     title: "Transactions",
@@ -74,6 +79,7 @@ export const COCKPIT_NAV: CockpitNavItem[] = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard, group: "workspace" },
   { name: "Chat", href: "/app/chat", icon: MessageSquare, group: "workspace" },
   { name: "Portfolio", href: "/app/portfolio", icon: PieChart, group: "portfolio" },
+  { name: "Markets", href: "/app/markets", icon: TrendingUp, group: "portfolio" },
   { name: "Transactions", href: "/app/transactions", icon: History, group: "portfolio" },
   { name: "Wallets", href: "/app/wallets", icon: Wallet, group: "assets" },
   { name: "NFTs", href: "/app/nfts", icon: Image, group: "assets" },

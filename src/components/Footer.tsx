@@ -14,6 +14,15 @@ export default function Footer() {
           </p>
         </div>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+          <Link to="/about" className="hover:text-foreground transition-colors">
+            About
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground transition-colors">
+            Privacy
+          </Link>
+          <Link to="/terms" className="hover:text-foreground transition-colors">
+            Terms
+          </Link>
           <a href="#journey" className="hover:text-foreground transition-colors">
             Journey
           </a>

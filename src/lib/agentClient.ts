@@ -446,7 +446,12 @@ export async function sendMessage(
   }
 
   if (isMockAgent()) {
-    return mockSendMessage(trimmed);
+    try {
+      return await mockSendMessage(trimmed);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Demo agent failed.";
+      return { text: `⚠️ ${msg}`, intent: "error" };
+    }
   }
 
   try {

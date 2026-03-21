@@ -11,7 +11,7 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#0A0F1F] via-[#1a1030]/90 to-[#0A0F1F]"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-background via-[#1a1030]/90 to-background"
       aria-labelledby="hero-heading"
     >
       <OrbitalParticles className="pointer-events-none absolute inset-0 h-full min-h-[100dvh] w-full" />
@@ -70,26 +70,33 @@ export default function HeroSection() {
             </li>
           </ul>
 
-          <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
-            <DemoWalletButton variant="hero" className="gradient-glow-cta w-full min-h-[56px] text-lg sm:w-auto sm:px-10 sm:text-xl" />
-            <Link
-              to="/auth"
-              className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl border border-[#6366f1]/40 bg-[#1A1F2E]/80 px-8 text-lg font-semibold text-[#F8FAFC] backdrop-blur-md transition-colors hover:border-[#8b5cf6]/60 hover:bg-[#1A1F2E] sm:w-auto"
-            >
-              Sign in
-            </Link>
-            <a
-              href="#demo"
-              className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl border border-[#334155]/80 bg-[#1A1F2E]/60 px-8 text-lg font-semibold text-[#F8FAFC] backdrop-blur-md transition-colors hover:border-[#6366f1]/50 hover:bg-[#1A1F2E] sm:w-auto"
-            >
-              Watch demo
-            </a>
-            <a
-              href="#journey"
-              className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl px-6 text-base font-medium text-[#94A3B8] underline-offset-4 hover:text-[#CBD5E1] hover:underline sm:w-auto sm:min-h-0 sm:py-0"
-            >
-              See full journey
-            </a>
+          <div className="flex w-full max-w-xl flex-col gap-3 sm:mx-auto">
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <DemoWalletButton
+                variant="hero"
+                className="gradient-glow-cta w-full min-h-[56px] text-lg sm:w-auto sm:min-w-[min(100%,14rem)] sm:px-10 sm:text-xl"
+              />
+              <Link
+                to="/auth"
+                className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl border border-[#6366f1]/40 bg-[#1A1F2E]/80 px-8 text-lg font-semibold text-foreground backdrop-blur-md transition-colors hover:border-[#8b5cf6]/60 hover:bg-[#1A1F2E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto sm:min-w-[min(100%,12rem)]"
+              >
+                Sign in
+              </Link>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
+              <a
+                href="#demo"
+                className="inline-flex h-12 min-h-[48px] w-full items-center justify-center rounded-xl border border-border/80 bg-secondary/40 px-6 text-base font-semibold text-foreground backdrop-blur-md transition-colors hover:border-primary/40 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto sm:px-8"
+              >
+                Watch demo
+              </a>
+              <a
+                href="#journey"
+                className="inline-flex min-h-[48px] items-center justify-center rounded-lg px-2 py-2 text-base font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:py-1"
+              >
+                See full journey
+              </a>
+            </div>
           </div>
 
           <p className="mt-8 text-sm text-[#94A3B8]">

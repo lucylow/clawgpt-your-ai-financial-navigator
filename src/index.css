@@ -69,6 +69,11 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
   }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+    color: hsl(var(--foreground));
+  }
 }
 
 @layer utilities {
@@ -125,6 +130,12 @@
   .glow-border {
     box-shadow: 0 0 20px hsl(var(--glow) / 0.15), inset 0 0 20px hsl(var(--glow) / 0.05);
   }
+
+  /** Minimum tap target (WCAG 2.5.5) — use on compact icon-only controls */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 @keyframes float {
@@ -151,12 +162,16 @@
   animation-play-state: paused;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ticker-marquee-track {
     animation-duration: 90s !important;
   }
-}
 
-html {
-  scroll-behavior: smooth;
+  html {
+    scroll-behavior: auto;
+  }
 }

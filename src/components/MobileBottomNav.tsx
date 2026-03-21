@@ -33,6 +33,7 @@ export default function MobileBottomNav() {
                 cn(
                   "touch-target flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 text-[11px] font-medium text-muted-foreground transition-colors",
                   "active:scale-[0.98]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   isActive && "bg-primary/15 text-primary"
                 )
               }

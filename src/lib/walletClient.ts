@@ -133,11 +133,11 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
 
 export async function refreshLivePortfolio(): Promise<void> {
   if (readWalletMode() !== "wdk") return;
-  const { clawWdk } = await loadWdkModule();
-  if (!clawWdk.isReady()) return;
   const t0 = performance.now();
   logChainExecution({ operation: "wallet.refresh_portfolio", phase: "start" });
   try {
+    const { clawWdk } = await loadWdkModule();
+    if (!clawWdk.isReady()) return;
     const snap = await clawWdk.buildPortfolioSnapshot();
     usePortfolioStore.getState().hydrateDemoPortfolio(snap);
     usePortfolioStore.getState().setPortfolioSyncError(null);
@@ -180,21 +180,27 @@ export async function createWallet(): Promise<{ address: string; chain: string }
 }
 
 export async function getBalances(queries: BalanceQuery[]): Promise<Record<string, number>> {
-  const { clawWdk } = await loadWdkModule();
-  if (!clawWdk.isReady()) {
-    return Object.fromEntries(queries.map((q) => [`${q.chain}:${q.address}`, 0]));
-  }
-  const out: Record<string, number> = {};
-  for (const q of queries) {
-    try {
-      const row = await clawWdk.fetchBalances(q.chain as WdkChainId);
-      const sum = (row.balances.USDT ?? 0) + (row.balances.XAUT ?? 0);
-      out[`${q.chain}:${q.address}`] = sum;
-    } catch {
-      out[`${q.chain}:${q.address}`] = 0;
+  const empty = (): Record<string, number> =>
+    Object.fromEntries(queries.map((q) => [`${q.chain}:${q.address}`, 0]));
+  try {
+    const { clawWdk } = await loadWdkModule();
+    if (!clawWdk.isReady()) {
+      return empty();
     }
+    const out: Record<string, number> = {};
+    for (const q of queries) {
+      try {
+        const row = await clawWdk.fetchBalances(q.chain as WdkChainId);
+        const sum = (row.balances.USDT ?? 0) + (row.balances.XAUT ?? 0);
+        out[`${q.chain}:${q.address}`] = sum;
+      } catch {
+        out[`${q.chain}:${q.address}`] = 0;
+      }
+    }
+    return out;
+  } catch {
+    return empty();
   }
-  return out;
 }
 
 export type SendTransactionResult =
@@ -262,44 +268,44 @@ export async function sendTransaction(
     });
     return { ok: false, error: "Invalid amount.", code: "VALIDATION" };
   }
-  const { clawWdk } = await loadWdkModule();
-  if (!clawWdk.isReady()) {
-    logChainExecution({
-      operation: "wallet.send_transaction",
-      phase: "end",
-      chain,
-      ok: false,
-      error: "wallet_not_ready",
-      detail: { code: "WALLET_NOT_READY" },
-    });
-    return {
-      ok: false,
-      error: "Wallet not connected. Connect WDK from the cockpit wallet control.",
-      code: "WALLET_NOT_READY",
-    };
-  }
-  if (chain !== "ethereum" && chain !== "polygon" && chain !== "arbitrum") {
-    logChainExecution({
-      operation: "wallet.send_transaction",
-      phase: "end",
-      chain,
-      ok: false,
-      error: "chain_unsupported",
-      detail: { code: "CHAIN_UNSUPPORTED" },
-    });
-    return {
-      ok: false,
-      error: `On-chain ${params.asset} transfer for ${chain} is not wired in this build (EVM testnets only).`,
-      code: "CHAIN_UNSUPPORTED",
-    };
-  }
-  logChainExecution({
-    operation: "wallet.send_transaction",
-    phase: "start",
-    chain,
-    detail: { asset: params.asset },
-  });
   try {
+    const { clawWdk } = await loadWdkModule();
+    if (!clawWdk.isReady()) {
+      logChainExecution({
+        operation: "wallet.send_transaction",
+        phase: "end",
+        chain,
+        ok: false,
+        error: "wallet_not_ready",
+        detail: { code: "WALLET_NOT_READY" },
+      });
+      return {
+        ok: false,
+        error: "Wallet not connected. Connect WDK from the cockpit wallet control.",
+        code: "WALLET_NOT_READY",
+      };
+    }
+    if (chain !== "ethereum" && chain !== "polygon" && chain !== "arbitrum") {
+      logChainExecution({
+        operation: "wallet.send_transaction",
+        phase: "end",
+        chain,
+        ok: false,
+        error: "chain_unsupported",
+        detail: { code: "CHAIN_UNSUPPORTED" },
+      });
+      return {
+        ok: false,
+        error: `On-chain ${params.asset} transfer for ${chain} is not wired in this build (EVM testnets only).`,
+        code: "CHAIN_UNSUPPORTED",
+      };
+    }
+    logChainExecution({
+      operation: "wallet.send_transaction",
+      phase: "start",
+      chain,
+      detail: { asset: params.asset },
+    });
     const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
     const r = await clawWdk.sendTetherTransfer({
       chain,
