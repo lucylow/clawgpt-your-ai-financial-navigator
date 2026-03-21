@@ -1,4 +1,4 @@
-import { WalletOff } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
