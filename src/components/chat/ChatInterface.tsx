@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, AlertCircle } from "lucide-react";
 import { assertCanApplyTransfer, evaluateUsdTSpend, totalPortfolioUsd } from "@/lib/economics/portfolioPolicy";
+import { assessTransaction } from "@/lib/risk-engine";
 import { sendMessage } from "@/lib/agentClient";
 import { saveChatMessage } from "@/lib/agent";
 import {
@@ -15,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { ChatCardPayload, Message, Transaction } from "@/types";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
+import { useProactiveAgent } from "@/hooks/useProactiveAgent";
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -43,6 +45,7 @@ export default function ChatInterface() {
   const workflowLog = usePortfolioStore((s) => s.agent.workflowLog);
   const decisionAudit = usePortfolioStore((s) => s.agent.decisionAudit ?? []);
   const walletMode = useDemoStore((s) => s.walletMode);
+  const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -58,6 +61,13 @@ export default function ChatInterface() {
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isThinking]);
+
+  const pushProactiveMessage = useCallback((msg: Message) => {
+    setMessages((prev) => [...prev, msg]);
+    appendAgentWorkflow("reconcile", "Proactive insight (autonomy scan)");
+  }, [appendAgentWorkflow]);
+
+  useProactiveAgent({ enabled: isDemoWalletConnected, onInsight: pushProactiveMessage });
 
   const pushTx = useCallback(
     (partial: Omit<Transaction, "hash" | "timestamp">) => {
@@ -105,6 +115,32 @@ export default function ChatInterface() {
           appendAgentWorkflow("execute", "Aborted: missing recipient");
           return;
         }
+
+        const risk = assessTransaction({
+          amountUsd: card.amount,
+          to: recipient,
+          chain: card.chain,
+          gasEstimateUsd: card.feeEstimateUsd ?? 2.5,
+          allocation: st.allocation,
+          allocationByAsset: st.allocationByAsset,
+        });
+        if (risk.recommendation === "BLOCK") {
+          toast({
+            variant: "destructive",
+            title: "Risk check",
+            description: risk.individual.map((r) => r.reason).join(" "),
+          });
+          appendDecisionAudit({ kind: "rejection", summary: "Risk engine blocked send", detail: { risk } });
+          appendAgentWorkflow("execute", "Aborted: risk engine");
+          return;
+        }
+        if (risk.recommendation === "REVIEW") {
+          toast({
+            title: "Review suggested",
+            description: risk.individual.map((r) => `${r.level}: ${r.reason}`).join(" · "),
+          });
+        }
+
         const res = await sendTransaction({
           chain: card.chain,
           to: recipient,

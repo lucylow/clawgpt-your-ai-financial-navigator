@@ -193,6 +193,7 @@ export function evaluateBridgeMove(input: BridgeEvaluationInput): BridgeDecision
     input.asset === "XAUt" ? "Gold token liquidity and spread risk" : "Stablecoin depeg risk (non-zero)",
   ];
 
+  const fromChainUsd = input.allocation[input.fromChain] ?? 0;
   const diversificationDelta =
     chainWeight(fromChainUsd, total) > budget.maxChainWeight * 0.95 ? "improves" : "neutral";
 

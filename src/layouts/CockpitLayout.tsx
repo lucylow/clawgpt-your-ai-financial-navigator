@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/useUIStore";
 import CockpitSidebar from "@/components/cockpit/CockpitSidebar";
 import CockpitHeader from "@/components/cockpit/CockpitHeader";
+import { WalletErrorBoundary } from "@/components/WalletErrorBoundary";
 import { useDemoModeEffects } from "@/hooks/useDemoModeEffects";
 import { useDemoStore } from "@/store/useDemoStore";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
@@ -27,7 +28,7 @@ export default function CockpitLayout() {
   }, []);
 
   return (
-    <div className="h-screen flex bg-background text-foreground overflow-hidden">
+    <div className="h-screen flex overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background text-foreground">
       <CockpitSidebar />
       <div
         className={cn(
@@ -37,7 +38,9 @@ export default function CockpitLayout() {
       >
         <CockpitHeader />
         <main className="flex-1 overflow-hidden">
-          <Outlet />
+          <WalletErrorBoundary>
+            <Outlet />
+          </WalletErrorBoundary>
         </main>
       </div>
     </div>

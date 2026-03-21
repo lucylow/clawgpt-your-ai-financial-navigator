@@ -18,6 +18,8 @@ interface DemoState {
   walletMode: "demo" | "wdk";
   connectDemoWallet: () => Promise<void>;
   disconnectDemoWallet: () => void;
+  /** Drop WDK session errors and use rich mock portfolio (cockpit stays “connected”). */
+  enterDemoMode: () => void;
   refreshPortfolio: () => void;
   tickRandomTransaction: () => void;
 }
@@ -92,6 +94,19 @@ export const useDemoStore = create<DemoState>((set, get) => ({
       /* ignore */
     }
     set({ isDemoWalletConnected: false, walletMode: "demo" });
+  },
+
+  enterDemoMode: () => {
+    disconnectWalletSession();
+    try {
+      sessionStorage.setItem(WALLET_MODE_KEY, "demo");
+    } catch {
+      /* ignore */
+    }
+    localStorage.setItem(DEMO_SESSION_KEY, "1");
+    set({ isDemoWalletConnected: true, walletMode: "demo" });
+    usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
+    usePortfolioStore.getState().setPortfolioSyncError(null);
   },
 
   refreshPortfolio: () => {
