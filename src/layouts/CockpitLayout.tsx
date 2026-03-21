@@ -7,6 +7,8 @@ import CockpitHeader from "@/components/cockpit/CockpitHeader";
 import { useDemoModeEffects } from "@/hooks/useDemoModeEffects";
 import { useDemoStore } from "@/store/useDemoStore";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
+import { restoreSessionIfNeeded } from "@/lib/walletClient";
+import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 
 export default function CockpitLayout() {
@@ -14,9 +16,14 @@ export default function CockpitLayout() {
   useDemoModeEffects();
 
   useEffect(() => {
-    if (useDemoStore.getState().isDemoWalletConnected) {
-      usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
+    if (!useDemoStore.getState().isDemoWalletConnected) return;
+    const mode =
+      typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
+    if (mode === "wdk") {
+      void restoreSessionIfNeeded();
+      return;
     }
+    usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
   }, []);
 
   return (

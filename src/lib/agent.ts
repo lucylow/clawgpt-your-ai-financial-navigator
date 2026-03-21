@@ -1,8 +1,13 @@
-import { supabase } from "@/integrations/supabase/client";
+import { loadConversation, saveChatMessage as persistChatMessage } from "@/services/chatMessages.service";
 
 export interface AgentMetadata {
   contractContext?: Record<string, unknown>;
+  /** Only applied on the client when `applyPortfolioUpdate` is true (e.g. post-confirmation reconcile). */
   portfolioUpdate?: Record<string, unknown>;
+  /** Tool output for display — never mutates portfolio state by itself. */
+  portfolioPreview?: Record<string, unknown>;
+  /** When true, `portfolioUpdate` may be merged into the client store (reconcile phase). */
+  applyPortfolioUpdate?: boolean;
 }
 
 export interface AgentResponse {
@@ -37,14 +42,21 @@ export async function streamAgentMessage({
     return;
   }
 
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!baseUrl || !anonKey) {
+    onError("Chat is not configured (missing Supabase URL or key).");
+    return;
+  }
+
+  const url = `${baseUrl.replace(/\/$/, "")}/functions/v1/agent-chat`;
 
   try {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${anonKey}`,
       },
       body: JSON.stringify({
         message: content.trim(),
@@ -52,24 +64,42 @@ export async function streamAgentMessage({
       }),
     });
 
-    // Handle non-streaming JSON error responses
+    // Handle non-streaming JSON responses (success or structured errors)
     const contentType = resp.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
-      const data = await resp.json();
-      if (data.error) {
-        onError(data.text || "Something went wrong.");
-      } else {
-        onDelta(data.text);
-        if (data.contractContext || data.portfolioUpdate) {
-          onMetadata?.({ contractContext: data.contractContext, portfolioUpdate: data.portfolioUpdate });
-        }
-        onDone();
+      let data: Record<string, unknown>;
+      try {
+        data = await resp.json();
+      } catch {
+        onError("Invalid response from the agent. Please try again.");
+        return;
       }
+      const failed = !resp.ok || data.error === true;
+      if (failed) {
+        const msg =
+          (typeof data.text === "string" && data.text) ||
+          (typeof data.message === "string" && data.message) ||
+          `Request failed (${resp.status}).`;
+        onError(msg);
+        return;
+      }
+      const reply = typeof data.text === "string" ? data.text : "";
+      if (reply) onDelta(reply);
+      if (data.contractContext || data.portfolioPreview || data.portfolioUpdate) {
+        onMetadata?.({
+          contractContext: data.contractContext as Record<string, unknown> | undefined,
+          portfolioPreview: data.portfolioPreview as Record<string, unknown> | undefined,
+          portfolioUpdate: data.portfolioUpdate as Record<string, unknown> | undefined,
+          applyPortfolioUpdate: data.applyPortfolioUpdate === true,
+        });
+      }
+      onDone();
       return;
     }
 
     if (!resp.ok || !resp.body) {
-      onError("Failed to reach the agent. Please try again.");
+      const statusMsg = !resp.ok ? `Agent returned ${resp.status}.` : "Empty response from agent.";
+      onError(`${statusMsg} Please try again.`);
       return;
     }
 
@@ -142,44 +172,16 @@ export async function streamAgentMessage({
   }
 }
 
-/**
- * Save a message to the chat_messages table for persistence.
- */
+/** Persist chat row — errors are logged; callers may ignore for UX continuity. */
 export async function saveChatMessage(
   userId: string,
   conversationId: string,
   role: "user" | "assistant",
   content: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ) {
-  const { error } = await supabase.from("chat_messages").insert([{
-    user_id: userId,
-    conversation_id: conversationId,
-    role,
-    content,
-    metadata: metadata || {},
-  }] as any);
+  const { error } = await persistChatMessage(userId, conversationId, role, content, metadata);
   if (error) console.error("[Agent] Failed to save message:", error);
 }
 
-/**
- * Load conversation history from the database.
- */
-export async function loadConversation(
-  userId: string,
-  conversationId: string
-): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
-  const { data, error } = await supabase
-    .from("chat_messages")
-    .select("role, content")
-    .eq("user_id", userId)
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(100);
-
-  if (error) {
-    console.error("[Agent] Failed to load conversation:", error);
-    return [];
-  }
-  return (data || []) as Array<{ role: "user" | "assistant"; content: string }>;
-}
+export { loadConversation };

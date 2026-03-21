@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles } from "lucide-react";
@@ -20,17 +21,33 @@ export default function DemoWalletButton({
 }: DemoWalletButtonProps) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
+  const [busy, setBusy] = useState(false);
   const connectDemoWallet = useDemoStore((s) => s.connectDemoWallet);
   const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
 
-  const handleClick = () => {
-    connectDemoWallet();
-    toast.success("Demo wallet connected!", {
-      description: "6-chain portfolio loaded — welcome to the cockpit.",
-      duration: 4000,
-    });
-    if (navigateToApp) {
-      navigate("/app");
+  const handleClick = async () => {
+    setBusy(true);
+    try {
+      await connectDemoWallet();
+      const mode = useDemoStore.getState().walletMode;
+      if (mode === "wdk") {
+        toast.success("Real WDK wallet connected", {
+          description: "Testnet RPCs — fund from faucets, then refresh balances in the cockpit.",
+          duration: 5000,
+        });
+      } else {
+        toast.success("Demo wallet connected!", {
+          description: "6-chain portfolio loaded — welcome to the cockpit.",
+          duration: 4000,
+        });
+      }
+      if (navigateToApp) {
+        navigate("/app");
+      }
+    } catch {
+      toast.error("Could not connect wallet");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -75,6 +92,7 @@ export default function DemoWalletButton({
   return (
     <motion.button
       type="button"
+      disabled={busy}
       onClick={handleClick}
       {...baseMotion}
       className={cn(
@@ -88,7 +106,7 @@ export default function DemoWalletButton({
       )}
     >
       <Sparkles className="h-5 w-5 shrink-0 opacity-95 sm:h-6 sm:w-6" aria-hidden />
-      Launch demo
+      {busy ? "Connecting…" : "Launch demo"}
     </motion.button>
   );
 }

@@ -1,40 +1,33 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+import { type ReactNode, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   children: ReactNode;
 }
 
+/**
+ * Requires Supabase session, or (unless VITE_REQUIRE_AUTH_FOR_APP=true) a demo wallet session flag.
+ * Unauthenticated users are sent to /auth?redirect=… for post-login return.
+ */
 export default function ProtectedRoute({ children }: Props) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, loading } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const requireAuthOnly = import.meta.env.VITE_REQUIRE_AUTH_FOR_APP === "true";
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-      const demo = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
-      if (!session && !demo) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-      const demo = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
-      if (!session && !demo) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (loading) return;
+    const demo =
+      typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+    const allowDemoBypass = !requireAuthOnly && demo;
+    if (session || allowDemoBypass) return;
+    const next = `${location.pathname}${location.search}`;
+    const redirect = encodeURIComponent(next.startsWith("/") ? next : "/app");
+    navigate(`/auth?redirect=${redirect}`, { replace: true });
+  }, [session, loading, navigate, location.pathname, location.search, requireAuthOnly]);
 
   if (loading) {
     return (
@@ -44,8 +37,10 @@ export default function ProtectedRoute({ children }: Props) {
     );
   }
 
-  const demoConnected = typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
-  if (!session && !demoConnected) return null;
+  const demoConnected =
+    typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+  const allowDemoBypass = !requireAuthOnly && demoConnected;
+  if (!session && !allowDemoBypass) return null;
 
   return <>{children}</>;
 }

@@ -1,3 +1,6 @@
+import type { AgentWorkflowEntry } from "@/lib/agentWorkflow";
+import type { ConfidenceScore, DecisionAuditEntry } from "@/lib/economics/types";
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -56,6 +59,11 @@ export type ChatCardPayload =
       asset: string;
       toLabel: string;
       chain: string;
+      /** Required for real WDK sends when env default is not set */
+      toAddress?: string;
+      feeEstimateUsd?: number;
+      usdtAfterOnChain?: number;
+      reserveNote?: string;
     }
   | {
       kind: "opportunity";
@@ -64,6 +72,22 @@ export type ChatCardPayload =
       fromChain: string;
       toChain: string;
       amount: number;
+      asset?: "USDt" | "XAUt";
+      /** Reserve = USDt liquidity; hedge = XAUt — not interchangeable */
+      assetRoleLabel?: string;
+      costEstimateUsd?: number;
+      expectedNetBenefitUsd?: number;
+      slippageBps?: number;
+      confidence?: ConfidenceScore;
+      whyNow?: string;
+      whyNotNow?: string;
+      principalRisks?: string[];
+      liquidityImpact?: string;
+      diversificationDelta?: "improves" | "worsens" | "neutral";
+      /** Chain → weight 0–1 after the move (demo / preview) */
+      postTradeChainWeights?: Record<string, number>;
+      /** Must match the benefit assumption used when the card was generated (for confirm-time checks) */
+      policyBenefitUsd?: number;
     }
   | {
       kind: "recurring_wizard";
@@ -89,4 +113,8 @@ export interface WalletEntry {
 export interface AgentSliceState {
   lastIntent: string | null;
   lastError: string | null;
+  /** OpenClaw-style transcript: intent → plan → review → execute → reconcile */
+  workflowLog: AgentWorkflowEntry[];
+  /** Cost-aware decision log (recommendations / holds / executions) */
+  decisionAudit?: DecisionAuditEntry[];
 }

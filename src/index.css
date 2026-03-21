@@ -147,6 +147,12 @@
   animation-play-state: paused;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .ticker-marquee-track {
+    animation-duration: 90s !important;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }

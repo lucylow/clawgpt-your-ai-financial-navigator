@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { TickerTransaction } from "@/types";
 import { TransactionItem } from "./TransactionItem";
 
@@ -7,7 +7,7 @@ interface MobileTickerProps {
 }
 
 export function MobileTicker({ transactions }: MobileTickerProps) {
-  const loop = transactions.length >= 2 ? [...transactions, ...transactions] : transactions;
+  const reduceMotion = useReducedMotion();
 
   if (!transactions.length) {
     return (
@@ -16,6 +16,28 @@ export function MobileTicker({ transactions }: MobileTickerProps) {
       </div>
     );
   }
+
+  if (transactions.length === 1) {
+    return (
+      <div className="relative h-24 overflow-hidden bg-gradient-to-b from-slate-950/90 to-transparent px-3 pt-2">
+        <TransactionItem tx={transactions[0]} compact showTime={false} />
+      </div>
+    );
+  }
+
+  if (reduceMotion) {
+    return (
+      <div className="max-h-24 overflow-y-auto bg-gradient-to-b from-slate-950/90 to-transparent px-3 py-2">
+        <div className="flex flex-col gap-2">
+          {transactions.map((tx) => (
+            <TransactionItem key={tx.id} tx={tx} compact showTime={false} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const loop = [...transactions, ...transactions];
 
   return (
     <div className="relative h-24 overflow-hidden bg-gradient-to-b from-slate-950/90 to-transparent">

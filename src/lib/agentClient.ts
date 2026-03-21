@@ -1,11 +1,25 @@
 import { streamAgentMessage, type AgentMetadata } from "@/lib/agent";
+import { assetRoleLabel } from "@/lib/economics/assetRoles";
+import { estimateSwapSlippage } from "@/lib/economics/executionCost";
+import {
+  evaluateBridgeMove,
+  evaluateUsdTSpend,
+  projectedChainWeightsAfterBridge,
+  totalPortfolioUsd,
+} from "@/lib/economics/portfolioPolicy";
+import type { AgentProposedPlan } from "@/lib/agentWorkflow";
 import type { AgentPortfolioUpdate, ChatCardPayload } from "@/types";
+import { usePortfolioStore } from "@/store/usePortfolioStore";
 
 export interface AgentClientResult {
   text: string;
   card?: ChatCardPayload;
   portfolioUpdate?: AgentPortfolioUpdate;
+  /** Read-only tool output — does not mutate Zustand unless user confirms in UI. */
+  portfolioPreview?: Record<string, unknown>;
   intent?: string;
+  /** Structured plan for review before any on-chain execution (OpenClaw boundary). */
+  proposedPlan?: AgentProposedPlan;
 }
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
@@ -22,10 +36,6 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function hashPrefix(): string {
-  return "0x" + Math.random().toString(16).slice(2, 10) + "…";
-}
-
 /**
  * Rich mock responses for demos — exercises portfolio Q&A, cards, and store updates.
  */
@@ -37,6 +47,15 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
     return {
       text: "I can set up a recurring buy. Review the plan below — you can adjust asset and frequency later when WDK is connected.",
       intent: "recurring_buy",
+      proposedPlan: {
+        title: "Recurring buy (schedule only)",
+        steps: [
+          "Choose asset and chain (USDt on Arbitrum in demos)",
+          "Set amount per run and frequency",
+          "Confirm schedule — execution requires WDK + confirmed automation",
+        ],
+        requiresOnChainConfirmation: false,
+      },
       card: {
         kind: "recurring_wizard",
         asset: "USDt",
@@ -51,30 +70,139 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
   }
 
   if (q.includes("idle") || (q.includes("arbitrum") && q.includes("move"))) {
+    const st = usePortfolioStore.getState();
+    const fromChain = "ethereum";
+    const toChain = "arbitrum";
+    const amountUsd = 800;
+    const asset = "USDt" as const;
+    const decision = evaluateBridgeMove({
+      allocation: st.allocation,
+      allocationByAsset: st.allocationByAsset,
+      fromChain,
+      toChain,
+      amountUsd,
+      asset,
+      /** Demo: user intent implies durable fee savings on L2; still gated by policy */
+      expectedBenefitUsd: 120,
+    });
+
+    usePortfolioStore.getState().appendDecisionAudit({
+      kind: decision.action === "hold" ? "hold" : "recommendation",
+      summary:
+        decision.action === "hold"
+          ? `Hold bridge: ${decision.reason}`
+          : `Bridge ${amountUsd} ${asset} ${fromChain}→${toChain}`,
+      detail: { fromChain, toChain, amountUsd, asset },
+    });
+
+    if (decision.action === "hold") {
+      return {
+        text:
+          `**Recommendation: hold.** ${decision.reason}\n\n` +
+          "USD₮ is modeled as **liquidity / working capital** — we only suggest bridges when the net benefit after fees, slippage, and reserve rules clears a minimum edge.",
+        intent: "idle_funds_hold",
+      };
+    }
+
+    const r = decision.recommendation;
+    const slip = estimateSwapSlippage({ fromAsset: asset, toAsset: asset, notionalUsd: amountUsd });
+    const slippageUsd = (amountUsd * slip.basisPoints) / 10_000;
+    const net = r.expectedBenefitUsd - r.executionCost.totalUsd - slippageUsd;
+    const weights = projectedChainWeightsAfterBridge(st.allocation, fromChain, toChain, amountUsd);
+    const card: Extract<ChatCardPayload, { kind: "opportunity" }> = {
+      kind: "opportunity",
+      summary: "USDt reserve could be deployed to a lower-fee execution chain",
+      suggestedAction: `Bridge ${amountUsd} USDt → ${toChain} (review costs below)`,
+      fromChain,
+      toChain,
+      amount: amountUsd,
+      asset,
+      policyBenefitUsd: 120,
+      assetRoleLabel: assetRoleLabel("reserve"),
+      costEstimateUsd: r.executionCost.totalUsd,
+      expectedNetBenefitUsd: net,
+      slippageBps: slip.basisPoints,
+      confidence: r.confidence,
+      whyNow: r.whyNow,
+      whyNotNow: r.whyNotNow,
+      principalRisks: r.principalRisks,
+      liquidityImpact: r.liquidityImpact,
+      diversificationDelta: r.diversificationDelta,
+      postTradeChainWeights: weights,
+    };
+
     return {
-      text: "You have **1,000 USDt** sitting on Ethereum with low utilization. Moving **800 USDt** to Arbitrum could reduce fees for upcoming trades.",
+      text:
+        `**USD₮ (liquidity sleeve):** moving **${amountUsd} USDt** from **${fromChain}** to **${toChain}** passes the cost / reserve checks.\n\n` +
+        `• **Est. execution cost:** ~$${r.executionCost.totalUsd.toFixed(2)}  \n` +
+        `• **Slippage (${slip.basisPoints} bps):** ~$${slippageUsd.toFixed(2)}  \n` +
+        `• **Modeled net vs hold:** ~$${net.toFixed(2)}  \n` +
+        `• **Confidence:** ${r.confidence}  \n\n` +
+        `XAUt is treated separately as a **hedge sleeve** — this suggestion does not treat tokens as interchangeable.`,
       intent: "idle_funds",
-      card: {
-        kind: "opportunity",
-        summary: "1,000 USDt idle on Ethereum",
-        suggestedAction: "Bridge 800 USDt → Arbitrum",
-        fromChain: "ethereum",
-        toChain: "arbitrum",
-        amount: 800,
+      proposedPlan: {
+        title: "Rebalance idle USDt (edge vs costs)",
+        steps: [
+          "Confirm source/target chains and amount",
+          "Review bridge path (demo simulates allocation only)",
+          "Reconcile balances after execution",
+        ],
+        requiresOnChainConfirmation: true,
       },
+      card,
     };
   }
 
   if (q.includes("send") && (q.includes("sarah") || q.includes("50"))) {
+    const envTo = import.meta.env.VITE_DEMO_TRANSFER_RECIPIENT?.trim();
+    const st = usePortfolioStore.getState();
+    const chain = "ethereum";
+    const amount = 50;
+    const total = totalPortfolioUsd(st.allocation);
+    const spend = evaluateUsdTSpend({
+      allocationByAsset: st.allocationByAsset,
+      chain,
+      amountUsd: amount,
+      totalPortfolioUsd: total,
+      gasEstimateUsd: 2.5,
+    });
+
+    usePortfolioStore.getState().appendDecisionAudit({
+      kind: spend.ok ? "recommendation" : "rejection",
+      summary: spend.ok ? `Prepared send ${amount} USDt on ${chain}` : spend.reason,
+      detail: { chain, amount },
+    });
+
+    if (!spend.ok) {
+      return {
+        text: `**Not recommended:** ${spend.reason}`,
+        intent: "transfer_blocked",
+      };
+    }
+
     return {
-      text: "I've prepared a **testnet** transfer. Confirm to simulate moving **50 USDt** to Sarah's address.",
+      text:
+        "I've prepared a **testnet** transfer. **USD₮** is modeled as **spendable liquidity** — confirm only after reviewing estimated gas and remaining on-chain reserve.",
       intent: "transfer_ready",
+      proposedPlan: {
+        title: "Send USDt (EVM testnet)",
+        steps: [
+          "Validate amount and chain",
+          "Preview recipient (from card or VITE_DEMO_TRANSFER_RECIPIENT)",
+          "Execute via WDK, then reconcile portfolio",
+        ],
+        requiresOnChainConfirmation: true,
+      },
       card: {
         kind: "transaction_ready",
         amount: 50,
         asset: "USDt",
         toLabel: "Sarah",
-        chain: "ethereum",
+        chain,
+        toAddress: envTo && envTo.startsWith("0x") ? envTo : undefined,
+        feeEstimateUsd: spend.gasUsd,
+        usdtAfterOnChain: spend.usdtAfter,
+        reserveNote: "~8% local USDt floor preserved where possible",
       },
     };
   }
@@ -116,13 +244,21 @@ async function streamToResult(
     });
   });
 
-  const portfolioUpdate = normalizePortfolioUpdate(metadata?.portfolioUpdate);
+  const portfolioUpdate = shouldApplyPortfolioMetadata(metadata)
+    ? normalizePortfolioUpdate(metadata?.portfolioUpdate)
+    : undefined;
 
   return {
     text,
     portfolioUpdate,
+    portfolioPreview: metadata?.portfolioPreview,
     intent: undefined,
   };
+}
+
+/** Exported for tests — live agent only mutates portfolio when metadata opts in. */
+export function shouldApplyPortfolioMetadata(meta: AgentMetadata | undefined): boolean {
+  return meta?.applyPortfolioUpdate === true;
 }
 
 function normalizePortfolioUpdate(

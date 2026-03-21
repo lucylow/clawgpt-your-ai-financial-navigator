@@ -1,6 +1,21 @@
 /** Session flag for frontend-only demo access (no Supabase auth). */
 export const DEMO_SESSION_KEY = "clawgpt_demo_wallet_connected";
 
+/** True when the landing "demo wallet" session is active (allows /app without Supabase). */
+export function isDemoSessionActive(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** BIP-39 phrase for the in-browser WDK session (sessionStorage — clear on tab close). */
+export const WDK_SEED_SESSION_KEY = "clawgpt_wdk_seed";
+
+/** `"wdk"` = Tether WDK + RPC; `"demo"` = rich mock portfolio. */
+export const WALLET_MODE_KEY = "clawgpt_wallet_mode";
+
 export const DEMO_WALLET = {
   seed: "test test test test test test test test test test test junk",
   addresses: {

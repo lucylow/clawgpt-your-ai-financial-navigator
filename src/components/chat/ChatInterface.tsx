@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, AlertCircle } from "lucide-react";
+import { assertCanApplyTransfer, evaluateUsdTSpend, totalPortfolioUsd } from "@/lib/economics/portfolioPolicy";
 import { sendMessage } from "@/lib/agentClient";
 import { saveChatMessage } from "@/lib/agent";
+import {
+  isRealWdkSession,
+  refreshLivePortfolio,
+  sendTransaction,
+} from "@/lib/walletClient";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
+import { useDemoStore } from "@/store/useDemoStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatCardPayload, Message, Transaction } from "@/types";
@@ -27,9 +34,26 @@ export default function ChatInterface() {
   const [error, setError] = useState<string | null>(null);
   const [conversationId] = useState(() => generateId());
   const chatRef = useRef<HTMLDivElement>(null);
-  const { applyAgentUpdate, setAgentIntent, setAgentError } = usePortfolioStore();
+  const applyAgentUpdate = usePortfolioStore((s) => s.applyAgentUpdate);
+  const setAgentIntent = usePortfolioStore((s) => s.setAgentIntent);
+  const setAgentError = usePortfolioStore((s) => s.setAgentError);
+  const appendAgentWorkflow = usePortfolioStore((s) => s.appendAgentWorkflow);
+  const clearAgentWorkflow = usePortfolioStore((s) => s.clearAgentWorkflow);
+  const appendDecisionAudit = usePortfolioStore((s) => s.appendDecisionAudit);
+  const workflowLog = usePortfolioStore((s) => s.agent.workflowLog);
+  const decisionAudit = usePortfolioStore((s) => s.agent.decisionAudit ?? []);
+  const walletMode = useDemoStore((s) => s.walletMode);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const wdkLive = walletMode === "wdk" && isRealWdkSession();
+  const confirmLabels = useMemo(
+    () => ({
+      transaction: wdkLive ? "Preview OK — submit via WDK" : "Confirm (simulated portfolio)",
+      opportunity: wdkLive ? "Simulate allocation shift (no bridge tx yet)" : "Apply suggestion (demo)",
+    }),
+    [wdkLive],
+  );
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -48,7 +72,80 @@ export default function ChatInterface() {
   );
 
   const onConfirmTransaction = useCallback(
-    (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => {
+    async (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => {
+      appendAgentWorkflow("review", "User confirmed transfer card");
+
+      const st = usePortfolioStore.getState();
+      const total = totalPortfolioUsd(st.allocation);
+      const spend = evaluateUsdTSpend({
+        allocationByAsset: st.allocationByAsset,
+        chain: card.chain,
+        amountUsd: card.amount,
+        totalPortfolioUsd: total,
+        gasEstimateUsd: card.feeEstimateUsd ?? 2.5,
+      });
+      if (!spend.ok) {
+        toast({ variant: "destructive", title: "Blocked", description: spend.reason });
+        appendDecisionAudit({ kind: "rejection", summary: spend.reason, detail: { card } });
+        appendAgentWorkflow("execute", "Aborted: spend policy");
+        return;
+      }
+
+      const recipient =
+        card.toAddress?.trim() || import.meta.env.VITE_DEMO_TRANSFER_RECIPIENT?.trim() || "";
+
+      if (wdkLive) {
+        if (!recipient.startsWith("0x") || recipient.length < 10) {
+          toast({
+            variant: "destructive",
+            title: "Recipient not configured",
+            description:
+              "Set VITE_DEMO_TRANSFER_RECIPIENT in .env or provide toAddress on the agent card for testnet sends.",
+          });
+          appendAgentWorkflow("execute", "Aborted: missing recipient");
+          return;
+        }
+        const res = await sendTransaction({
+          chain: card.chain,
+          to: recipient,
+          amount: String(card.amount),
+          asset: card.asset === "XAUt" ? "XAUt" : "USDt",
+        });
+        if (!res.ok) {
+          toast({ variant: "destructive", title: "Transfer failed", description: res.error });
+          appendAgentWorkflow("execute", `Failed: ${res.error}`);
+          return;
+        }
+        const tx: Transaction = {
+          type: "send",
+          amount: card.amount,
+          asset: "USDt",
+          fromChain: card.chain,
+          toChain: card.chain,
+          toAddress: recipient.slice(0, 6) + "…" + recipient.slice(-4),
+          hash: res.hash,
+          status: res.status === "confirmed" ? "confirmed" : "pending",
+          timestamp: Date.now(),
+        };
+        applyAgentUpdate({ type: "add_transaction", tx });
+        let portfolioRefreshed = false;
+        try {
+          await refreshLivePortfolio();
+          portfolioRefreshed = true;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Portfolio refresh failed.";
+          toast({ variant: "destructive", title: "Sync warning", description: msg });
+          appendAgentWorkflow("reconcile", `Portfolio refresh failed: ${msg}`);
+        }
+        appendAgentWorkflow("execute", `Submitted ${res.hash}`);
+        if (portfolioRefreshed) {
+          appendAgentWorkflow("reconcile", "Portfolio refreshed");
+        }
+        appendDecisionAudit({ kind: "execution", summary: `WDK send ${card.amount} USDt`, detail: { hash: res.hash } });
+        toast({ title: "Transaction submitted", description: res.hash });
+        return;
+      }
+
       pushTx({
         type: "send",
         amount: card.amount,
@@ -59,18 +156,44 @@ export default function ChatInterface() {
         status: "confirmed",
       });
       const alloc = { ...usePortfolioStore.getState().allocation };
+      const nested = { ...usePortfolioStore.getState().allocationByAsset };
       const chain = card.chain as keyof typeof alloc;
       if (alloc[chain] != null) {
         alloc[chain] = Math.max(0, alloc[chain] - card.amount);
+        const row = { ...(nested[card.chain] ?? {}) };
+        row.USDt = Math.max(0, (row.USDt ?? 0) - card.amount);
+        nested[card.chain] = row;
         applyAgentUpdate({ type: "set_allocation", allocation: alloc });
+        usePortfolioStore.getState().setAllocationByAsset(nested);
       }
+      appendDecisionAudit({ kind: "execution", summary: `Demo send ${card.amount} USDt`, detail: { chain: card.chain } });
+      appendAgentWorkflow("execute", "Simulated send (demo portfolio)");
+      appendAgentWorkflow("reconcile", "Portfolio + ticker updated (demo)");
       toast({ title: "Demo transaction", description: `${card.amount} ${card.asset} send simulated.` });
     },
-    [applyAgentUpdate, pushTx, toast]
+    [appendAgentWorkflow, appendDecisionAudit, applyAgentUpdate, pushTx, toast, wdkLive]
   );
 
   const onConfirmOpportunity = useCallback(
-    (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => {
+    async (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => {
+      appendAgentWorkflow("review", "User confirmed opportunity card");
+      const st = usePortfolioStore.getState();
+      const gate = assertCanApplyTransfer({
+        allocation: st.allocation,
+        allocationByAsset: st.allocationByAsset,
+        fromChain: card.fromChain,
+        toChain: card.toChain,
+        amountUsd: card.amount,
+        asset: card.asset ?? "USDt",
+        expectedBenefitUsd: card.policyBenefitUsd,
+      });
+      if (!gate.ok) {
+        toast({ variant: "destructive", title: "Not executed", description: gate.reason });
+        appendDecisionAudit({ kind: "rejection", summary: gate.reason, detail: { card } });
+        appendAgentWorkflow("execute", "Aborted: policy gate");
+        return;
+      }
+
       applyAgentUpdate({
         type: "transfer",
         fromChain: card.fromChain,
@@ -86,9 +209,27 @@ export default function ChatInterface() {
         toAddress: "0xself",
         status: "confirmed",
       });
+      appendDecisionAudit({
+        kind: "execution",
+        summary: `Bridge ${card.amount} ${card.asset ?? "USDt"} ${card.fromChain}→${card.toChain}`,
+        detail: { card },
+      });
+      if (wdkLive) {
+        try {
+          await refreshLivePortfolio();
+          appendAgentWorkflow("reconcile", "Portfolio refreshed after simulated bridge");
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Portfolio refresh failed.";
+          toast({ variant: "destructive", title: "Sync warning", description: msg });
+          appendAgentWorkflow("reconcile", `Portfolio refresh failed: ${msg}`);
+        }
+      } else {
+        appendAgentWorkflow("execute", "Simulated bridge — no on-chain bridge in this build");
+        appendAgentWorkflow("reconcile", "Allocation updated (demo)");
+      }
       toast({ title: "Bridge simulated", description: `${card.amount} USDt ${card.fromChain} → ${card.toChain}` });
     },
-    [applyAgentUpdate, pushTx, toast]
+    [appendAgentWorkflow, appendDecisionAudit, applyAgentUpdate, pushTx, toast, wdkLive]
   );
 
   const onWizardStep = useCallback((messageId: string, step: number) => {
@@ -97,12 +238,14 @@ export default function ChatInterface() {
 
   const onWizardDone = useCallback(
     (_messageId: string) => {
+      appendAgentWorkflow("execute", "Recurring wizard completed (demo)");
+      appendAgentWorkflow("reconcile", "Schedule stored locally — WDK required for real execution");
       toast({
         title: "Recurring plan saved (demo)",
         description: "Connect WDK to execute on testnet.",
       });
     },
-    [toast]
+    [appendAgentWorkflow, toast]
   );
 
   const handleSend = useCallback(async () => {
@@ -115,6 +258,7 @@ export default function ChatInterface() {
     setInput("");
     setIsThinking(true);
     setAgentError(null);
+    appendAgentWorkflow("intent", text.length > 120 ? `${text.slice(0, 120)}…` : text);
 
     if (user?.id) {
       saveChatMessage(user.id, conversationId, "user", text);
@@ -130,6 +274,16 @@ export default function ChatInterface() {
     try {
       const result = await sendMessage(text, history);
       setAgentIntent(result.intent ?? null);
+
+      if (result.proposedPlan) {
+        appendAgentWorkflow(
+          "plan",
+          `${result.proposedPlan.title} (${result.proposedPlan.steps.length} steps)`,
+        );
+      } else if (result.intent) {
+        appendAgentWorkflow("plan", `Intent: ${result.intent}`);
+      }
+      appendAgentWorkflow("review", "Assistant reply ready — confirm any on-chain actions in cards");
 
       if (result.portfolioUpdate) {
         applyAgentUpdate(result.portfolioUpdate);
@@ -166,6 +320,7 @@ export default function ChatInterface() {
     user?.id,
     conversationId,
     applyAgentUpdate,
+    appendAgentWorkflow,
     setAgentIntent,
     setAgentError,
     toast,
@@ -174,6 +329,7 @@ export default function ChatInterface() {
   const handleClear = () => {
     setMessages([WELCOME_MESSAGE]);
     setError(null);
+    clearAgentWorkflow();
   };
 
   return (
@@ -182,7 +338,9 @@ export default function ChatInterface() {
         <span className="text-lg">🤖</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground">Claw</p>
-          <p className="text-xs text-primary">{isThinking ? "Thinking…" : "Online · demo agent"}</p>
+          <p className="text-xs text-primary">
+            {isThinking ? "Thinking…" : wdkLive ? "Online · WDK session" : "Online · agent (mock or Supabase)"}
+          </p>
         </div>
         <button
           type="button"
@@ -193,6 +351,32 @@ export default function ChatInterface() {
           <Trash2 size={14} />
         </button>
       </div>
+
+      {workflowLog.length > 0 && (
+        <details className="mx-4 mt-2 text-[10px] text-muted-foreground border border-border/30 rounded-md px-2 py-1.5 bg-secondary/20">
+          <summary className="cursor-pointer select-none font-medium text-foreground/80">Workflow log</summary>
+          <ul className="mt-1 space-y-0.5 font-mono max-h-24 overflow-y-auto">
+            {workflowLog.slice(-8).map((e, i) => (
+              <li key={`${e.at}-${e.phase}-${i}`}>
+                <span className="text-primary/90">{e.phase}</span> · {e.detail}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {decisionAudit.length > 0 && (
+        <details className="mx-4 mt-2 text-[10px] text-muted-foreground border border-border/30 rounded-md px-2 py-1.5 bg-secondary/20">
+          <summary className="cursor-pointer select-none font-medium text-foreground/80">Decision audit</summary>
+          <ul className="mt-1 space-y-0.5 font-mono max-h-24 overflow-y-auto">
+            {decisionAudit.slice(-6).map((e, i) => (
+              <li key={`${e.at}-${e.kind}-${i}`}>
+                <span className="text-amber-400/90">{e.kind}</span> · {e.summary}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {error && (
         <div className="mx-4 mt-2 p-2 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center gap-2 text-xs text-destructive">
@@ -212,6 +396,8 @@ export default function ChatInterface() {
         onWizardDone={onWizardDone}
         onConfirmTransaction={onConfirmTransaction}
         onConfirmOpportunity={onConfirmOpportunity}
+        confirmTransactionLabel={confirmLabels.transaction}
+        confirmOpportunityLabel={confirmLabels.opportunity}
       />
 
       <MessageInput value={input} onChange={setInput} onSend={handleSend} disabled={isThinking} />

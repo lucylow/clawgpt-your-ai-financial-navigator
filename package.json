@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -44,6 +45,11 @@
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@supabase/supabase-js": "^2.99.1",
+    "@tetherto/wdk": "^1.0.0-beta.6",
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.10",
+    "@tetherto/wdk-wallet-solana": "^1.0.0-beta.5",
+    "@tetherto/wdk-wallet-ton": "^1.0.0-beta.7",
+    "@tetherto/wdk-wallet-tron": "^1.0.0-beta.4",
     "@tanstack/react-query": "^5.83.0",
     "braces": "3.0.2",
     "class-variance-authority": "^0.7.1",

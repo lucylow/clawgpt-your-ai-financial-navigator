@@ -8,8 +8,10 @@ interface MessageListProps {
   scrollRef: React.RefObject<HTMLDivElement>;
   onWizardStep: (messageId: string, step: number) => void;
   onWizardDone: (messageId: string) => void;
-  onConfirmTransaction: (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => void;
-  onConfirmOpportunity: (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => void;
+  onConfirmTransaction: (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => void | Promise<void>;
+  onConfirmOpportunity: (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => void | Promise<void>;
+  confirmTransactionLabel?: string;
+  confirmOpportunityLabel?: string;
 }
 
 export default function MessageList({
@@ -20,6 +22,8 @@ export default function MessageList({
   onWizardDone,
   onConfirmTransaction,
   onConfirmOpportunity,
+  confirmTransactionLabel,
+  confirmOpportunityLabel,
 }: MessageListProps) {
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -31,6 +35,8 @@ export default function MessageList({
           onWizardDone={onWizardDone}
           onConfirmTransaction={onConfirmTransaction}
           onConfirmOpportunity={onConfirmOpportunity}
+          confirmTransactionLabel={confirmTransactionLabel}
+          confirmOpportunityLabel={confirmOpportunityLabel}
         />
       ))}
       {isThinking && (

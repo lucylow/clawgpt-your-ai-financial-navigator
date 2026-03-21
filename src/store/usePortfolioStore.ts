@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import { appendWorkflow } from "@/lib/agentWorkflow";
+import type { AgentWorkflowPhase } from "@/lib/agentWorkflow";
+import type { DecisionAuditEntry } from "@/lib/economics/types";
 import type {
   AgentPortfolioUpdate,
   AgentSliceState,
@@ -15,6 +18,8 @@ interface PortfolioState {
   chains: string[];
   wallets: WalletEntry[];
   error: string | null;
+  /** Last error from WDK / live portfolio sync (distinct from validation `error`). */
+  portfolioSyncError: string | null;
   agent: AgentSliceState;
 
   /** Full replace for frontend demo / mock hydration */
@@ -35,6 +40,10 @@ interface PortfolioState {
   updateFromAgentCommand: (command: unknown) => void;
   setAgentIntent: (intent: string | null) => void;
   setAgentError: (message: string | null) => void;
+  appendAgentWorkflow: (phase: AgentWorkflowPhase, detail: string) => void;
+  clearAgentWorkflow: () => void;
+  appendDecisionAudit: (entry: Omit<DecisionAuditEntry, "at"> & { at?: number }) => void;
+  setPortfolioSyncError: (message: string | null) => void;
   clearError: () => void;
 }
 
@@ -109,7 +118,8 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
   chains: ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"],
   wallets: demoWallets,
   error: null,
-  agent: { lastIntent: null, lastError: null },
+  portfolioSyncError: null,
+  agent: { lastIntent: null, lastError: null, workflowLog: [], decisionAudit: [] },
 
   hydrateDemoPortfolio: (payload) => {
     set({
@@ -119,6 +129,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
       transactions: payload.transactions,
       wallets: payload.wallets,
       error: null,
+      portfolioSyncError: null,
     });
   },
 
@@ -167,7 +178,17 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         const newAllocation = { ...get().allocation };
         newAllocation[fromChain] = (newAllocation[fromChain] || 0) - amount;
         newAllocation[toChain] = (newAllocation[toChain] || 0) + amount;
-        set({ allocation: newAllocation, error: null });
+        const nested = { ...get().allocationByAsset };
+        const fromRow = { ...(nested[fromChain] ?? {}) };
+        const toRow = { ...(nested[toChain] ?? {}) };
+        const moveUsdT = Math.min(amount, fromRow.USDt ?? 0);
+        if (moveUsdT > 0) {
+          fromRow.USDt = (fromRow.USDt ?? 0) - moveUsdT;
+          toRow.USDt = (toRow.USDt ?? 0) + moveUsdT;
+        }
+        nested[fromChain] = fromRow;
+        nested[toChain] = toRow;
+        set({ allocation: newAllocation, allocationByAsset: nested, error: null });
         return;
       }
       if (update.type === "add_transaction") {
@@ -201,6 +222,32 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
   setAgentIntent: (intent) => set((s) => ({ agent: { ...s.agent, lastIntent: intent } })),
   setAgentError: (message) =>
     set((s) => ({ agent: { ...s.agent, lastError: message } })),
+
+  appendDecisionAudit: (entry) =>
+    set((s) => {
+      const row: DecisionAuditEntry = { ...entry, at: entry.at ?? Date.now() };
+      return {
+        agent: {
+          ...s.agent,
+          decisionAudit: [...(s.agent.decisionAudit ?? []), row].slice(-40),
+        },
+      };
+    }),
+
+  appendAgentWorkflow: (phase, detail) =>
+    set((s) => ({
+      agent: {
+        ...s.agent,
+        workflowLog: appendWorkflow(s.agent.workflowLog, phase, detail).slice(-50),
+      },
+    })),
+
+  clearAgentWorkflow: () =>
+    set((s) => ({
+      agent: { ...s.agent, workflowLog: [], decisionAudit: [] },
+    })),
+
+  setPortfolioSyncError: (message) => set({ portfolioSyncError: message }),
 
   clearError: () => set({ error: null }),
 }));

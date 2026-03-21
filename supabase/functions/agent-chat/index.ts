@@ -152,20 +152,34 @@ const tools = [
 
 // ── Tool execution ───────────────────────────────────────────────────────────
 
-function executeTool(name: string, args: Record<string, any>): { text: string; contractContext?: Record<string, any>; portfolioUpdate?: Record<string, any> } {
+function executeTool(name: string, args: Record<string, any>): {
+  text: string;
+  contractContext?: Record<string, any>;
+  /** Read-only preview — client does not mutate portfolio until user confirms + reconcile */
+  portfolioPreview?: Record<string, any>;
+} {
   switch (name) {
     case "transfer_tokens": {
       const config = CHAIN_CONFIGS[args.chain];
-      const tokenContract = config.tokens[args.asset];
+      if (!config?.tokens) {
+        return { text: `Unsupported or unknown chain: ${String(args.chain ?? "")}.` };
+      }
+      const tokenContract = config.tokens[args.asset as keyof typeof config.tokens];
+      if (!tokenContract) {
+        return { text: `Token ${String(args.asset)} is not configured on ${config.name}.` };
+      }
       const addr = args.to_address ? `${args.to_address.slice(0, 6)}…${args.to_address.slice(-4)}` : "pending";
       return {
         text: `📤 **Transfer prepared**\n\n• **Amount:** ${args.amount} ${args.asset}\n• **To:** ${addr}\n• **Chain:** ${config.name} (ID ${config.chainId})\n• **Token contract:** \`${tokenContract}\`\n• **Estimated gas:** ~$1.20\n\nConfirm in your wallet to proceed.`,
         contractContext: { action: "erc20_transfer", tokenContract, chain: args.chain, chainId: config.chainId, to: args.to_address, amount: args.amount },
-        portfolioUpdate: { type: "transfer", fromChain: args.chain, toChain: args.chain, amount: args.amount },
+        portfolioPreview: { type: "transfer", fromChain: args.chain, toChain: args.chain, amount: args.amount },
       };
     }
     case "swap_tokens": {
       const config = CHAIN_CONFIGS[args.chain];
+      if (!config?.protocols?.uniswap || !config.tokens) {
+        return { text: `Swaps are not available on ${String(args.chain ?? "this chain")}.` };
+      }
       const uniswap = config.protocols.uniswap;
       return {
         text: `🔄 **Swap prepared**\n\n• **From:** ${args.amount} ${args.from_asset} → ${args.to_asset}\n• **Chain:** ${config.name}\n• **Router:** \`${uniswap.router}\`\n• **Token In:** \`${config.tokens[args.from_asset]}\`\n• **Token Out:** \`${config.tokens[args.to_asset]}\`\n\nConfirm to execute the swap.`,
@@ -175,13 +189,25 @@ function executeTool(name: string, args: Record<string, any>): { text: string; c
     case "bridge_tokens": {
       const from = CHAIN_CONFIGS[args.from_chain];
       const to = CHAIN_CONFIGS[args.to_chain];
+      if (!from || !to) {
+        return { text: `Unknown bridge route: ${String(args.from_chain)} → ${String(args.to_chain)}.` };
+      }
       return {
-        text: `🌉 **Bridge prepared**\n\n• **Amount:** ${args.amount} ${args.asset}\n• **From:** ${from.name}\n• **To:** ${to.name}\n\nConfirm to initiate the bridge.`,
-        portfolioUpdate: { type: "transfer", fromChain: args.from_chain, toChain: args.to_chain, amount: args.amount },
+        text:
+          `🌉 **Bridge preview (no state change until user confirms + reconcile)**\n\n` +
+          `• **Amount:** ${args.amount} ${args.asset}\n` +
+          `• **From:** ${from.name}\n` +
+          `• **To:** ${to.name}\n` +
+          `• **USD₮** is liquidity / settlement; **XAUt** is a hedge sleeve (not cash) — compare net benefit vs bridge + gas before acting.\n\n` +
+          `Client applies allocation only when metadata sets \`applyPortfolioUpdate: true\` after confirmation.`,
+        portfolioPreview: { type: "bridge", fromChain: args.from_chain, toChain: args.to_chain, amount: args.amount, asset: args.asset },
       };
     }
     case "aave_deposit": {
       const config = CHAIN_CONFIGS[args.chain];
+      if (!config?.protocols?.aave || !config.tokens) {
+        return { text: `Aave deposits are not configured for ${String(args.chain ?? "this chain")}.` };
+      }
       const aave = config.protocols.aave;
       return {
         text: `🏦 **Aave Deposit prepared**\n\n• **Asset:** ${args.asset}\n• **Amount:** ${args.amount}\n• **Chain:** ${config.name}\n• **Lending Pool:** \`${aave.lendingPool}\`\n• **Estimated APY:** ~4.2%\n\nTwo transactions needed: Approve → Deposit.`,
@@ -190,6 +216,9 @@ function executeTool(name: string, args: Record<string, any>): { text: string; c
     }
     case "aave_withdraw": {
       const config = CHAIN_CONFIGS[args.chain];
+      if (!config?.protocols?.aave || !config.tokens) {
+        return { text: `Aave withdrawals are not configured for ${String(args.chain ?? "this chain")}.` };
+      }
       const aave = config.protocols.aave;
       return {
         text: `🏦 **Aave Withdrawal prepared**\n\n• **Asset:** ${args.asset}\n• **Amount:** ${args.amount}\n• **Chain:** ${config.name}\n• **Lending Pool:** \`${aave.lendingPool}\`\n\nConfirm to withdraw.`,
@@ -228,6 +257,8 @@ function executeTool(name: string, args: Record<string, any>): { text: string; c
 
 const SYSTEM_PROMPT = `You are Claw, an expert AI financial assistant for managing USDt and XAUt tokens across multiple blockchains (Ethereum, Polygon, Arbitrum, Solana, Tron).
 
+Economic framing (Tether): **USD₮** is digital dollar liquidity / settlement capital. **XAUt** represents gold exposure (hedge / store-of-value sleeve), not a substitute for routine spending. Do not treat them as interchangeable “just another asset.”
+
 Your capabilities (use the provided tools):
 - **Transfer tokens**: Send USDt or XAUt to any address on any supported chain
 - **Swap tokens**: Swap between USDt and XAUt via Uniswap (Ethereum, Polygon, Arbitrum only)
@@ -238,6 +269,10 @@ Your capabilities (use the provided tools):
 - **Chain info**: List supported chains and protocols
 
 Guidelines:
+- Prefer **holding** when expected improvement after fees, slippage, and liquidity impact is unclear or small
+- Always surface **costs** (gas, spread/slippage, protocol fees) and **principal risks** (bridge, depeg, liquidation for leverage)
+- For any recommendation, mention **why now**, **why not now**, and **confidence**; never present upside as certain
+- Yield / leverage requires explicit downside and protocol counterparty risk
 - Always use the appropriate tool when the user wants to perform an action
 - Ask for missing parameters (amount, chain, address) before calling a tool
 - Be concise and use markdown formatting
@@ -311,13 +346,25 @@ Deno.serve(async (req: Request) => {
     // If the model wants to call tools
     if (choice?.finish_reason === "tool_calls" || choice?.message?.tool_calls?.length) {
       const toolCalls = choice.message.tool_calls;
-      const toolResults: Array<{ text: string; contractContext?: any; portfolioUpdate?: any }> = [];
+      const toolResults: Array<{ text: string; contractContext?: any; portfolioPreview?: any }> = [];
 
       // Execute all tool calls
       for (const tc of toolCalls) {
-        const args = typeof tc.function.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function.arguments;
-        const result = executeTool(tc.function.name, args);
-        toolResults.push(result);
+        try {
+          let args: Record<string, unknown>;
+          if (typeof tc.function.arguments === "string") {
+            args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+          } else {
+            args = (tc.function.arguments ?? {}) as Record<string, unknown>;
+          }
+          const result = executeTool(tc.function.name, args as Record<string, any>);
+          toolResults.push(result);
+        } catch (e) {
+          console.error("executeTool error:", tc?.function?.name, e);
+          toolResults.push({
+            text: `Tool error (${tc?.function?.name ?? "?"}): ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
       }
 
       // Build tool results into messages for a follow-up LLM call
@@ -351,14 +398,14 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({
           text: combined,
           contractContext: toolResults.find(r => r.contractContext)?.contractContext,
-          portfolioUpdate: toolResults.find(r => r.portfolioUpdate)?.portfolioUpdate,
+          portfolioPreview: toolResults.find(r => r.portfolioPreview)?.portfolioPreview,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       // Stream the follow-up response, but also attach metadata
       const metadata = {
         contractContext: toolResults.find(r => r.contractContext)?.contractContext,
-        portfolioUpdate: toolResults.find(r => r.portfolioUpdate)?.portfolioUpdate,
+        portfolioPreview: toolResults.find(r => r.portfolioPreview)?.portfolioPreview,
       };
 
       // We need to pass metadata alongside the stream. We'll use a custom SSE format.
@@ -366,7 +413,7 @@ Deno.serve(async (req: Request) => {
       const stream = new ReadableStream({
         async start(controller) {
           // Send metadata first as a special event
-          if (metadata.contractContext || metadata.portfolioUpdate) {
+          if (metadata.contractContext || metadata.portfolioPreview) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ metadata })}\n\n`));
           }
           // Then pipe through the AI stream

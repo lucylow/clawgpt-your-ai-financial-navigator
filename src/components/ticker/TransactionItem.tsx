@@ -180,7 +180,7 @@ export const TransactionItem = memo(
   (prev, next) =>
     prev.tx.id === next.tx.id &&
     prev.tx.status === next.tx.status &&
-    prev.tx.timestamp === next.tx.timestamp &&
+    prev.tx.age === next.tx.age &&
     prev.compact === next.compact &&
     prev.showTime === next.showTime
 );

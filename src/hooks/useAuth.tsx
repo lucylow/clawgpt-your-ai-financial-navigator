@@ -1,6 +1,8 @@
 import { useEffect, useState, createContext, useContext, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
 import type { User, Session } from "@supabase/supabase-js";
+import { useDemoStore } from "@/store/useDemoStore";
 
 interface AuthContextType {
   user: User | null;
@@ -28,17 +30,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      })
+      .catch((err) => {
+        console.error("[Auth] getSession failed:", err);
+        setSession(null);
+        setUser(null);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("[Auth] signOut failed:", e);
+    }
+    try {
+      localStorage.removeItem(DEMO_SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
     setUser(null);
     setSession(null);
   };

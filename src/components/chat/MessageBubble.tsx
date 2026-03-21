@@ -7,8 +7,11 @@ interface MessageBubbleProps {
   message: Message;
   onWizardStep?: (messageId: string, step: number) => void;
   onWizardDone?: (messageId: string) => void;
-  onConfirmTransaction?: (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => void;
-  onConfirmOpportunity?: (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => void;
+  onConfirmTransaction?: (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => void | Promise<void>;
+  onConfirmOpportunity?: (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => void | Promise<void>;
+  /** Overrides default "Confirm (demo)" / WDK labels from parent */
+  confirmTransactionLabel?: string;
+  confirmOpportunityLabel?: string;
 }
 
 export default function MessageBubble({
@@ -17,6 +20,8 @@ export default function MessageBubble({
   onWizardDone,
   onConfirmTransaction,
   onConfirmOpportunity,
+  confirmTransactionLabel = "Confirm (demo)",
+  confirmOpportunityLabel = "Apply suggestion (demo)",
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const step = message.wizardStep ?? 0;
@@ -40,16 +45,28 @@ export default function MessageBubble({
 
       {message.card?.kind === "transaction_ready" && (
         <div className="mt-3 rounded-lg border border-primary/30 bg-background/40 p-3 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Transaction ready</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Review & confirm</p>
           <p className="text-foreground">
             Send {message.card.amount} {message.card.asset} on {message.card.chain} → {message.card.toLabel}
           </p>
+          {message.card.feeEstimateUsd != null ? (
+            <p className="text-[11px] text-muted-foreground">
+              Est. gas / fees ~${message.card.feeEstimateUsd.toFixed(2)} · USDt on-chain after ~$
+              {message.card.usdtAfterOnChain?.toFixed(0) ?? "—"}
+            </p>
+          ) : null}
+          {message.card.reserveNote ? (
+            <p className="text-[10px] text-muted-foreground">{message.card.reserveNote}</p>
+          ) : null}
+          {message.card.toAddress ? (
+            <p className="text-[10px] text-muted-foreground font-mono break-all">To: {message.card.toAddress}</p>
+          ) : null}
           <div className="flex gap-2 pt-1">
             <Button
               size="sm"
-              onClick={() => onConfirmTransaction?.(message.card)}
+              onClick={() => void onConfirmTransaction?.(message.card)}
             >
-              Confirm (demo)
+              {confirmTransactionLabel}
             </Button>
           </div>
         </div>
@@ -58,10 +75,66 @@ export default function MessageBubble({
       {message.card?.kind === "opportunity" && (
         <div className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/5 p-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">Opportunity</p>
+          {message.card.assetRoleLabel ? (
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+              Role: {message.card.assetRoleLabel}
+              {message.card.asset ? ` · ${message.card.asset}` : ""}
+            </p>
+          ) : null}
           <p className="text-muted-foreground text-xs">{message.card.summary}</p>
           <p className="text-foreground text-sm">{message.card.suggestedAction}</p>
-          <Button size="sm" variant="secondary" onClick={() => onConfirmOpportunity?.(message.card!)}>
-            Apply suggestion (demo)
+          {message.card.costEstimateUsd != null ? (
+            <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc list-inside">
+              <li>Est. execution cost ~${message.card.costEstimateUsd.toFixed(2)}</li>
+              {message.card.slippageBps != null ? (
+                <li>Slippage ~{message.card.slippageBps} bps</li>
+              ) : null}
+              {message.card.expectedNetBenefitUsd != null ? (
+                <li>Modeled net vs hold ~${message.card.expectedNetBenefitUsd.toFixed(2)}</li>
+              ) : null}
+              {message.card.confidence ? <li>Confidence: {message.card.confidence}</li> : null}
+            </ul>
+          ) : null}
+          {message.card.whyNow ? (
+            <p className="text-[11px] text-foreground/90">
+              <span className="font-medium text-amber-400/90">Why now: </span>
+              {message.card.whyNow}
+            </p>
+          ) : null}
+          {message.card.whyNotNow ? (
+            <p className="text-[11px] text-muted-foreground">
+              <span className="font-medium">Why not / wait: </span>
+              {message.card.whyNotNow}
+            </p>
+          ) : null}
+          {message.card.principalRisks?.length ? (
+            <p className="text-[10px] text-muted-foreground">
+              <span className="font-medium text-foreground/80">Risks: </span>
+              {message.card.principalRisks.join("; ")}
+            </p>
+          ) : null}
+          {message.card.liquidityImpact ? (
+            <p className="text-[10px] text-muted-foreground">{message.card.liquidityImpact}</p>
+          ) : null}
+          {message.card.diversificationDelta ? (
+            <p className="text-[10px] text-muted-foreground">
+              Diversification: {message.card.diversificationDelta}
+            </p>
+          ) : null}
+          {message.card.postTradeChainWeights && Object.keys(message.card.postTradeChainWeights).length > 0 ? (
+            <p className="text-[10px] text-muted-foreground font-mono">
+              Post-trade chain weights (preview):{" "}
+              {Object.entries(message.card.postTradeChainWeights)
+                .map(([c, w]) => `${c} ${(w * 100).toFixed(1)}%`)
+                .join(" · ")}
+            </p>
+          ) : null}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void onConfirmOpportunity?.(message.card!)}
+          >
+            {confirmOpportunityLabel}
           </Button>
         </div>
       )}

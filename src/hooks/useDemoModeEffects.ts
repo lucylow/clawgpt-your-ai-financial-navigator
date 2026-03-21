@@ -6,16 +6,20 @@ import { useDemoStore } from "@/store/useDemoStore";
  */
 export function useDemoModeEffects() {
   const connected = useDemoStore((s) => s.isDemoWalletConnected);
+  const walletMode = useDemoStore((s) => s.walletMode);
   const refreshPortfolio = useDemoStore((s) => s.refreshPortfolio);
   const tickRandomTransaction = useDemoStore((s) => s.tickRandomTransaction);
 
   useEffect(() => {
     if (!connected) return;
     const id15 = window.setInterval(() => refreshPortfolio(), 15_000);
-    const id30 = window.setInterval(() => tickRandomTransaction(), 30_000);
+    const id30 =
+      walletMode === "demo"
+        ? window.setInterval(() => tickRandomTransaction(), 30_000)
+        : undefined;
     return () => {
       window.clearInterval(id15);
-      window.clearInterval(id30);
+      if (id30 !== undefined) window.clearInterval(id30);
     };
-  }, [connected, refreshPortfolio, tickRandomTransaction]);
+  }, [connected, walletMode, refreshPortfolio, tickRandomTransaction]);
 }
