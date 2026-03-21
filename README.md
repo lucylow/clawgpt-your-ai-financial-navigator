@@ -11,8 +11,6 @@
 
 ClawGPT is an AI-powered financial cockpit for navigating multi-chain assets through a conversational interface. The repository combines a polished landing page, a protected authenticated cockpit, a 3D globe-based visual layer, live-style transaction telemetry, and a smart-contract folder for on-chain experimentation. The project is built with React, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Three Fiber, Supabase, and a modern routing/data stack.
 
-This README is written as a project-level guide for developers, reviewers, and hackathon judges. It documents the architecture, repository layout, runtime flow, UI composition, security boundaries, setup steps, testing strategy, and the most important extension points in the codebase.
-
 ---
 
 ## Table of contents
