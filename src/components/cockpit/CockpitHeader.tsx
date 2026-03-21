@@ -58,14 +58,15 @@ export default function CockpitHeader() {
           </Badge>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
+        <div className="flex items-center gap-2 shrink-0">
+        <Link
+          to="/app/chat"
           className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+          title="Open Claw chat"
         >
           <Bell size={16} />
           <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full" />
-        </button>
+        </Link>
         <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-medium text-foreground">
           CN
         </div>

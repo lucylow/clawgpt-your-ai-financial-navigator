@@ -10,6 +10,7 @@ import {
 import type { AgentProposedPlan } from "@/lib/agentWorkflow";
 import type { AgentPortfolioUpdate, ChatCardPayload } from "@/types";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
+import { PortfolioAnalyzerSkill } from "@/lib/agent-skills";
 
 export interface AgentClientResult {
   text: string;
@@ -42,6 +43,32 @@ function delay(ms: number) {
 async function mockSendMessage(content: string): Promise<AgentClientResult> {
   const q = content.toLowerCase();
   await delay(400 + Math.random() * 400);
+
+  if (q.includes("analyze") || q.includes("risk score") || q.includes("opportunities")) {
+    const a = PortfolioAnalyzerSkill.analyze();
+    const oppLines = a.opportunities
+      .slice(0, 4)
+      .map(
+        (o) =>
+          `• **${o.chain}**: ~$${o.estimatedEarningsUsd.toLocaleString()}/yr at ${o.potentialApy}% APY (model)`,
+      )
+      .join("\n");
+    return {
+      text:
+        `**Portfolio analyzer (agent skill)**\n\n` +
+        `• **NAV:** ~$${a.totalValueUsd.toLocaleString()}\n` +
+        `• **USDt (liquidity):** $${a.totalUsdT.toLocaleString()}\n` +
+        `• **XAUt (hedge):** $${a.totalXautUsd.toLocaleString()}\n` +
+        `• **Concentration / sleeve risk:** **${a.riskScoreLabel}**\n\n` +
+        (a.opportunities.length
+          ? `**Idle / yield opportunities:**\n${oppLines}\n\n`
+          : "**No idle USDt blocks flagged** over the demo threshold.\n\n") +
+        (a.recommendations.length
+          ? `**Recommendations:**\n${a.recommendations.map((r) => `• ${r}`).join("\n")}`
+          : ""),
+      intent: "portfolio_analysis",
+    };
+  }
 
   if (q.includes("recurring") || q.includes("dca")) {
     return {
@@ -217,7 +244,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
 
   return {
     text:
-      "I'm running in **demo mode** with mocked reasoning. Try:\n- “What’s my total portfolio?”\n- “Send 50 USDT to Sarah”\n- “Set up a recurring buy”\n- “Move idle USDT to Arbitrum”",
+      "I'm running in **demo mode** with mocked reasoning. Try:\n- “Analyze portfolio risk”\n- “What’s my total portfolio?”\n- “Send 50 USDT to Sarah”\n- “Set up a recurring buy”\n- “Move idle USDT to Arbitrum”",
     intent: "fallback",
   };
 }

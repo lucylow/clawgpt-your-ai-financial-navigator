@@ -5,6 +5,7 @@ import { useUIStore } from "@/store/useUIStore";
 import CockpitSidebar from "@/components/cockpit/CockpitSidebar";
 import CockpitHeader from "@/components/cockpit/CockpitHeader";
 import { WalletErrorBoundary } from "@/components/WalletErrorBoundary";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import { useDemoModeEffects } from "@/hooks/useDemoModeEffects";
 import { useDemoStore } from "@/store/useDemoStore";
 import { getDemoPortfolioSnapshot } from "@/lib/mockData";
@@ -37,11 +38,12 @@ export default function CockpitLayout() {
         )}
       >
         <CockpitHeader />
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden pb-[5.5rem] md:pb-0">
           <WalletErrorBoundary>
             <Outlet />
           </WalletErrorBoundary>
         </main>
+        <MobileBottomNav />
       </div>
     </div>
   );

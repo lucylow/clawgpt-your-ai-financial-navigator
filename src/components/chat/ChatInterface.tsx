@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRumbleTips } from "@/hooks/useRumbleTips";
 import { Trash2, AlertCircle } from "lucide-react";
 import { assertCanApplyTransfer, evaluateUsdTSpend, totalPortfolioUsd } from "@/lib/economics/portfolioPolicy";
 import { assessTransaction } from "@/lib/risk-engine";
@@ -46,6 +47,8 @@ export default function ChatInterface() {
   const decisionAudit = usePortfolioStore((s) => s.agent.decisionAudit ?? []);
   const walletMode = useDemoStore((s) => s.walletMode);
   const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
+  const rumbleTips = useRumbleTips();
+  const rumbleTipsAnnounced = useRef(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -68,6 +71,22 @@ export default function ChatInterface() {
   }, [appendAgentWorkflow]);
 
   useProactiveAgent({ enabled: isDemoWalletConnected, onInsight: pushProactiveMessage });
+
+  useEffect(() => {
+    if (rumbleTips.length === 0 || rumbleTipsAnnounced.current) return;
+    rumbleTipsAnnounced.current = true;
+    const total = rumbleTips.reduce((s, t) => s + t.amount, 0);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: generateId(),
+        role: "assistant",
+        content:
+          `**Rumble tips (dev / mock):** ${rumbleTips.length} event(s), **$${total.toFixed(2)}** total. ` +
+          `Production will use your WDK + webhook; cards for split / yield / withdraw can attach here.`,
+      },
+    ]);
+  }, [rumbleTips]);
 
   const pushTx = useCallback(
     (partial: Omit<Transaction, "hash" | "timestamp">) => {

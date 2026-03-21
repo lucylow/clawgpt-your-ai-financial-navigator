@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useTickerFeed } from "@/hooks/useTickerFeed";
 import { useTickerStore } from "@/store/useTickerStore";
+import { usePortfolioStore } from "@/store/usePortfolioStore";
 import type { TickerTransaction } from "@/types";
 import { InfiniteScroll } from "./InfiniteScroll";
 import { MobileTicker } from "./MobileTicker";
@@ -21,7 +22,16 @@ function LiveRegion({ transactions }: { transactions: TickerTransaction[] }) {
 
 export function TransactionTicker() {
   const transactions = useTickerFeed();
+  const totalValue = usePortfolioStore((s) => s.totalValue);
   const addDemoTransaction = useTickerStore((s) => s.addDemoTransaction);
+
+  /** Larger portfolios → slightly faster marquee (more “activity”). */
+  const marqueeDurationSec = useMemo(() => {
+    const t = Number.isFinite(totalValue) ? totalValue : 0;
+    if (t > 50_000) return 32;
+    if (t > 15_000) return 40;
+    return 48;
+  }, [totalValue]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -51,7 +61,7 @@ export function TransactionTicker() {
 
       <div className="hidden h-20 sm:block">
         {transactions.length ? (
-          <InfiniteScroll durationSec={48} className="flex items-center">
+          <InfiniteScroll durationSec={marqueeDurationSec} className="flex items-center">
             {transactions.map((tx) => (
               <TransactionItem key={tx.id} tx={tx} />
             ))}

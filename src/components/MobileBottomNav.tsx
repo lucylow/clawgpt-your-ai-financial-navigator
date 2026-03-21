@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, MessageCircle, PieChart, Settings } from "lucide-react";
+import { LayoutDashboard, MessageCircle, PieChart, Settings, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { to: "/app", end: true, label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/chat", end: false, label: "Chat", icon: MessageCircle },
+  { to: "/app", end: true, label: "Home", icon: LayoutDashboard },
+  { to: "/app/chat", end: false, label: "Claw", icon: MessageCircle },
+  { to: "/app/transactions", end: false, label: "Activity", icon: Zap },
   { to: "/app/portfolio", end: false, label: "Portfolio", icon: PieChart },
   { to: "/app/settings", end: false, label: "Settings", icon: Settings },
 ] as const;
