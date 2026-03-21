@@ -136,7 +136,7 @@ function enqueue(event: Omit<ObservabilityEvent, "ts" | "sessionId" | "path">): 
   queue.push(full);
   persistQueue();
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.MODE !== "test") {
     const label =
       full.kind === "error"
         ? `[obs:error] ${full.message}`

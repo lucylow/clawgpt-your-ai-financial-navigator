@@ -52,7 +52,7 @@ function transactionCardFromMetadata(metadata: AgentMetadata | undefined): ChatC
   };
 }
 
-function useMockAgent(): boolean {
+function isMockAgent(): boolean {
   const flag = import.meta.env.VITE_USE_MOCK_AGENT;
   if (flag === "false") return false;
   if (flag === "true") return true;
@@ -445,7 +445,7 @@ export async function sendMessage(
     return { text: "Ask me anything about your portfolio.", intent: "empty" };
   }
 
-  if (useMockAgent()) {
+  if (isMockAgent()) {
     return mockSendMessage(trimmed);
   }
 

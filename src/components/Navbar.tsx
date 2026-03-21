@@ -98,6 +98,7 @@ export default function Navbar() {
             <div className="hidden shrink-0 items-center gap-1 sm:gap-2 md:flex">
               <Link
                 to="/auth"
+                data-track="nav_sign_in"
                 className="inline-flex min-h-[40px] items-center rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
               >
                 Sign in
@@ -172,6 +173,7 @@ export default function Navbar() {
             <Link
               to="/auth"
               onClick={closeMobile}
+              data-track="nav_sign_in"
               className="flex min-h-[48px] w-full items-center justify-center rounded-xl border border-border/50 bg-secondary/40 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/60"
             >
               Sign in

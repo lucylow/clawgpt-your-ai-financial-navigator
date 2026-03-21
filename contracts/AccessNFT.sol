@@ -117,7 +117,7 @@ contract AccessNFT is ERC721URIStorage, AccessControl {
         return tokens;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC721) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC721URIStorage) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }

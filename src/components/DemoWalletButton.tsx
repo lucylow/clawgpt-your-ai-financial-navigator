@@ -74,6 +74,7 @@ export default function DemoWalletButton({
     return (
       <Link
         to="/app"
+        data-track="demo_open_cockpit"
         className={cn(
           "inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-300",
           variant === "hero" && "px-8 py-3.5 text-base min-h-[52px] shadow-lg shadow-indigo-500/20",
@@ -93,6 +94,7 @@ export default function DemoWalletButton({
     <motion.button
       type="button"
       disabled={busy}
+      data-track="demo_launch_wallet"
       onClick={handleClick}
       {...baseMotion}
       className={cn(

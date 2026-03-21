@@ -48,11 +48,12 @@ export default function AuthPage() {
           description: "We sent a confirmation link to verify your account.",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Auth]", err);
+      const message = err instanceof Error ? err.message : "Something went wrong.";
       toast({
         title: "Authentication failed",
-        description: err?.message || "Something went wrong.",
+        description: message,
         variant: "destructive",
       });
     } finally {

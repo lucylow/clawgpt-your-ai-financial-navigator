@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Optional HTTPS endpoint that accepts POST `{ events: ObservabilityEvent[] }` JSON batches. */
+  readonly VITE_OBSERVABILITY_INGEST_URL?: string;
   /** Optional public path when the app is not served at domain root (read in vite.config only). */
   readonly VITE_BASE_PATH?: string;
   readonly VITE_USE_MOCK_AGENT?: string;
