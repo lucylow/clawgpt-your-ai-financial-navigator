@@ -26,7 +26,12 @@ export default function MessageList({
   confirmOpportunityLabel,
 }: MessageListProps) {
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+    <section
+      ref={scrollRef}
+      className="flex-1 space-y-3 overflow-y-auto p-4"
+      aria-label="Conversation with Claw"
+      role="region"
+    >
       {messages.map((m) => (
         <MessageBubble
           key={m.id}
@@ -39,12 +44,17 @@ export default function MessageList({
           confirmOpportunityLabel={confirmOpportunityLabel}
         />
       ))}
-      {isThinking && (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 size={14} className="animate-spin" />
-          Claw is thinking…
+      {isThinking ? (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+        >
+          <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden />
+          <span>Claw is analyzing your request…</span>
         </div>
-      )}
-    </div>
+      ) : null}
+    </section>
   );
 }

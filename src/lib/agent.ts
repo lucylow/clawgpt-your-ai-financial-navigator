@@ -4,8 +4,31 @@ import {
   supabaseEdgeFunctionUrl,
   supabaseEnvKey,
 } from "@/lib/supabaseEnv";
+import {
+  formatAgentErrorMessage,
+  parseAgentBackendError,
+} from "@/contracts/agentBackendError";
 import { loadConversation, saveChatMessage as persistChatMessage } from "@/services/chatMessages.service";
 import type { AgentSafetyEnvelope } from "@/lib/agentSafety";
+
+function newCorrelationId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `corr_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
+/** Versioned server-emitted events (SSE metadata); aligns with supabase/functions/_shared/events.ts */
+export type AgentBackendEventV1 = {
+  v: 1;
+  id: string;
+  type: string;
+  correlationId: string;
+  ts: string;
+  severity: "info" | "warning" | "error";
+  payload: Record<string, unknown>;
+};
 
 export interface AgentMetadata {
   contractContext?: Record<string, unknown>;
@@ -17,6 +40,25 @@ export interface AgentMetadata {
   applyPortfolioUpdate?: boolean;
   /** Approval gates, previews, validation, policy, and simulation — server + client defense in depth. */
   safety?: AgentSafetyEnvelope;
+  /** Trace id from edge function (header or body). */
+  correlationId?: string;
+  /** Structured lifecycle events for cockpit / ticker integration. */
+  events?: AgentBackendEventV1[];
+  /** Deterministic turn contract from edge pipeline (intent, entities, gating). */
+  agentContract?: Record<string, unknown>;
+  /** Edge tool execution phase (preview vs blocked) — mirrors supabase `_shared/types` TransactionLifecycleStateV1. */
+  transactionLifecycle?: Record<string, unknown>;
+}
+
+function mergeCorrelationFromHeaders(
+  meta: AgentMetadata | undefined,
+  headerId: string | null,
+): AgentMetadata | undefined {
+  if (!meta && !headerId) return undefined;
+  const h = headerId?.trim();
+  if (!h) return meta;
+  if (!meta) return { correlationId: h };
+  return { ...meta, correlationId: meta.correlationId ?? h };
 }
 
 export interface AgentResponse {
@@ -27,6 +69,20 @@ export interface AgentResponse {
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
+/** Mirrors supabase `sessionMemory` — no secrets. */
+export type AgentSessionMemoryV1 = {
+  v: 1;
+  activeChainKey?: string;
+  activeWalletLabel?: string;
+  automationPaused?: boolean;
+  dailyLimitUsd?: number;
+  demoMode?: boolean;
+  /** User-owned cap echoed to edge policy prompts (no secrets). */
+  maxSingleTxUsd?: number;
+  /** Chains the user allows for this session (subset). */
+  approvedChainKeys?: string[];
+};
+
 /**
  * Streams a message to the agent-chat edge function.
  * Calls onDelta for each token, onMetadata for tool results, onDone when finished.
@@ -34,6 +90,9 @@ type HistoryMessage = { role: "user" | "assistant"; content: string };
 export async function streamAgentMessage({
   content,
   history,
+  sessionMemory,
+  idempotencyKey,
+  correlationId: clientCorrelationId,
   onDelta,
   onMetadata,
   onDone,
@@ -41,6 +100,12 @@ export async function streamAgentMessage({
 }: {
   content: string;
   history: HistoryMessage[];
+  /** Optional cockpit context for deterministic intent / policy (edge validates shape). */
+  sessionMemory?: AgentSessionMemoryV1;
+  /** Client idempotency hint for duplicate POST protection (echoed by edge). */
+  idempotencyKey?: string;
+  /** Optional client trace id (min 8 chars per edge schema). */
+  correlationId?: string;
   onDelta: (text: string) => void;
   onMetadata?: (meta: AgentMetadata) => void;
   onDone: () => void;
@@ -63,16 +128,26 @@ export async function streamAgentMessage({
     return;
   }
 
+  const traceId =
+    clientCorrelationId && clientCorrelationId.length >= 8 ? clientCorrelationId : newCorrelationId();
+
   try {
+    const requestHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...supabaseEdgeFunctionHeaders(anonKey),
+      "X-Correlation-Id": traceId,
+    };
+    if (idempotencyKey) requestHeaders["X-Idempotency-Key"] = idempotencyKey;
+
     const resp = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...supabaseEdgeFunctionHeaders(anonKey),
-      },
+      headers: requestHeaders,
       body: JSON.stringify({
         message: content.trim(),
         history: history.slice(-20),
+        correlationId: traceId,
+        ...(sessionMemory ? { sessionMemory } : {}),
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       }),
     });
 
@@ -97,14 +172,36 @@ export async function streamAgentMessage({
       }
       const reply = typeof data.text === "string" ? data.text : "";
       if (reply) onDelta(reply);
-      if (data.contractContext || data.portfolioPreview || data.portfolioUpdate || data.safety) {
-        onMetadata?.({
+      const headerCorr = resp.headers.get("x-correlation-id")?.trim();
+      if (
+        data.contractContext ||
+        data.portfolioPreview ||
+        data.portfolioUpdate ||
+        data.safety ||
+        data.correlationId ||
+        data.events ||
+        data.agentContract ||
+        data.transactionLifecycle ||
+        headerCorr
+      ) {
+        const base: AgentMetadata = {
           contractContext: data.contractContext as Record<string, unknown> | undefined,
           portfolioPreview: data.portfolioPreview as Record<string, unknown> | undefined,
           portfolioUpdate: data.portfolioUpdate as Record<string, unknown> | undefined,
           applyPortfolioUpdate: data.applyPortfolioUpdate === true,
           safety: data.safety as AgentSafetyEnvelope | undefined,
-        });
+          correlationId:
+            (typeof data.correlationId === "string" ? data.correlationId : undefined) ?? headerCorr ?? traceId,
+          events: Array.isArray(data.events) ? (data.events as AgentBackendEventV1[]) : undefined,
+          agentContract: data.agentContract && typeof data.agentContract === "object"
+            ? (data.agentContract as Record<string, unknown>)
+            : undefined,
+          transactionLifecycle:
+            data.transactionLifecycle && typeof data.transactionLifecycle === "object"
+              ? (data.transactionLifecycle as Record<string, unknown>)
+              : undefined,
+        };
+        onMetadata?.(base);
       }
       onDone();
       return;
@@ -166,7 +263,9 @@ export async function streamAgentMessage({
 
             // Check for metadata event (tool results)
             if (parsed.metadata) {
-              onMetadata?.(parsed.metadata);
+              onMetadata?.(
+                mergeCorrelationFromHeaders(parsed.metadata as AgentMetadata, sseHeaderCorrelation),
+              );
               continue;
             }
 
@@ -190,7 +289,12 @@ export async function streamAgentMessage({
           if (jsonStr === "[DONE]") continue;
           try {
             const parsed = JSON.parse(jsonStr);
-            if (parsed.metadata) { onMetadata?.(parsed.metadata); continue; }
+            if (parsed.metadata) {
+              onMetadata?.(
+                mergeCorrelationFromHeaders(parsed.metadata as AgentMetadata, sseHeaderCorrelation),
+              );
+              continue;
+            }
             const token = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (token) onDelta(token);
           } catch { /* ignore */ }

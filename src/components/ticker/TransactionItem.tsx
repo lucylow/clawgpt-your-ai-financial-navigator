@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -81,7 +81,7 @@ function TransactionItemInner({ tx, compact = false, showTime = true }: Transact
           "flex items-center justify-between gap-3 rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-xs font-mono backdrop-blur",
           "min-h-[2.5rem]"
         )}
-        whileHover={{ scale: 1.01 }}
+        whileHover={reduceMotion ? undefined : { scale: 1.01 }}
         transition={{ type: "spring", stiffness: 400, damping: 24 }}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -107,7 +107,7 @@ function TransactionItemInner({ tx, compact = false, showTime = true }: Transact
   return (
     <motion.div
       className="mx-2 flex h-full shrink-0 items-center gap-3 rounded-xl border border-slate-700/50 bg-slate-800/50 px-6 py-3 text-sm font-mono backdrop-blur md:gap-4"
-      whileHover={{ scale: 1.02, y: -1 }}
+      whileHover={reduceMotion ? undefined : { scale: 1.02, y: -1 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
     >
       {showTime && (

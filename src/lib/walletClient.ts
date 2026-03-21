@@ -15,6 +15,7 @@ import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { logChainExecution } from "@/lib/observability";
 import { formatGasSummary, simulateTetherEvmTransfer } from "@/lib/evmSimulation";
 import { classifyWalletError } from "@/lib/web3Errors";
+import { getRuntimeCapabilities, getTetherTransferSupport } from "@/lib/wdkRegistry";
 
 type WdkModule = typeof import("@/lib/wdkClient");
 
@@ -246,7 +247,8 @@ export async function simulateTetherTransfer(params: SendTransactionParams): Pro
       return { ok: false, error: "Wallet not connected." };
     }
 
-    if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
+    const caps = getRuntimeCapabilities(chain);
+    if (caps.evmTransferPreview) {
       const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
       const from = await clawWdk.getSignerAddressForChain(chain);
       const sim = await simulateTetherEvmTransfer(chain, from, params.to.trim(), params.amount, asset);
@@ -340,18 +342,20 @@ export async function sendTransaction(
         code: "WALLET_NOT_READY",
       };
     }
-    if (chain !== "ethereum" && chain !== "polygon" && chain !== "arbitrum") {
+    const tw = params.asset === "XAUt" ? "XAUt" : "USDt";
+    const transferSupport = getTetherTransferSupport(chain, tw);
+    if (!transferSupport.ok) {
       logChainExecution({
         operation: "wallet.send_transaction",
         phase: "end",
         chain,
         ok: false,
-        error: "chain_unsupported",
-        detail: { code: "CHAIN_UNSUPPORTED" },
+        error: "capability_unsupported",
+        detail: { code: transferSupport.code, wdkPackage: transferSupport.packageName },
       });
       return {
         ok: false,
-        error: `On-chain ${params.asset} transfer for ${chain} is not wired in this build (EVM testnets only).`,
+        error: transferSupport.message,
         code: "CHAIN_UNSUPPORTED",
       };
     }
@@ -359,14 +363,13 @@ export async function sendTransaction(
       operation: "wallet.send_transaction",
       phase: "start",
       chain,
-      detail: { asset: params.asset },
+      detail: { asset: tw },
     });
-    const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
     const r = await clawWdk.sendTetherTransfer({
       chain,
       to: params.to.trim(),
       amount: params.amount,
-      asset,
+      asset: tw,
     });
     logChainExecution({
       operation: "wallet.send_transaction",

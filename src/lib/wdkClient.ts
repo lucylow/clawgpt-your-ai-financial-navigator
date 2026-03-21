@@ -16,6 +16,7 @@ import {
   SUPPORTED_WDK_CHAINS,
   type WdkChainId,
 } from "@/config/chains";
+import { CHAIN_WALLET_REGISTRY, getTetherTransferSupport } from "@/lib/wdkRegistry";
 import { TETHER_DECIMALS } from "@/config/tetherAssets";
 import { logChainExecution } from "@/lib/observability";
 
@@ -87,21 +88,47 @@ export class ClawWdkBridge {
     try {
       this.disconnect();
       const tonCfg = getTonClientConfig();
-      this.wdk = new WDK(seedPhrase)
-        .registerWallet("ethereum", WalletManagerEvm, { provider: getEvmRpc("ethereum") })
-        .registerWallet("polygon", WalletManagerEvm, { provider: getEvmRpc("polygon") })
-        .registerWallet("arbitrum", WalletManagerEvm, { provider: getEvmRpc("arbitrum") })
-        .registerWallet("tron", WalletManagerTron, { provider: getTronRpc() })
-        .registerWallet("solana", WalletManagerSolana, {
-          rpcUrl: getSolanaRpc(),
-          commitment: "confirmed",
-        })
-        .registerWallet("ton", WalletManagerTon, { tonClient: tonCfg });
+      let wdk: InstanceType<typeof WDK> = new WDK(seedPhrase);
+      for (const chain of SUPPORTED_WDK_CHAINS) {
+        const meta = CHAIN_WALLET_REGISTRY[chain];
+        switch (meta.moduleKind) {
+          case "evm":
+            wdk = wdk.registerWallet(meta.registerKey, WalletManagerEvm, {
+              provider: getEvmRpc(chain as "ethereum" | "polygon" | "arbitrum"),
+            }) as InstanceType<typeof WDK>;
+            break;
+          case "solana":
+            wdk = wdk.registerWallet(meta.registerKey, WalletManagerSolana, {
+              rpcUrl: getSolanaRpc(),
+              commitment: "confirmed",
+            }) as InstanceType<typeof WDK>;
+            break;
+          case "tron":
+            wdk = wdk.registerWallet(meta.registerKey, WalletManagerTron, {
+              provider: getTronRpc(),
+            }) as InstanceType<typeof WDK>;
+            break;
+          case "ton":
+            wdk = wdk.registerWallet(meta.registerKey, WalletManagerTon, {
+              tonClient: tonCfg,
+            }) as InstanceType<typeof WDK>;
+            break;
+          default: {
+            const _exhaustive: never = meta.moduleKind;
+            throw new Error(`Unhandled WDK module kind: ${_exhaustive}`);
+          }
+        }
+      }
+      this.wdk = wdk;
       logChainExecution({
         operation: "wdk.connect",
         phase: "end",
         durationMs: Math.round(performance.now() - t0),
         ok: true,
+        detail: {
+          chains: SUPPORTED_WDK_CHAINS.length,
+          wdkCore: "@tetherto/wdk",
+        },
       });
     } catch (e) {
       logChainExecution({
@@ -328,12 +355,32 @@ export class ClawWdkBridge {
     if (!this.wdk) throw new Error("WDK not connected");
     const { chain, to, amount, asset } = params;
     const t0 = performance.now();
+    const support = getTetherTransferSupport(chain, asset);
     logChainExecution({
       operation: "wdk.transfer",
       phase: "start",
       chain,
-      detail: { asset, to: redactRecipient(to) },
+      detail: {
+        asset,
+        to: redactRecipient(to),
+        wdkPackage: support.ok ? CHAIN_WALLET_REGISTRY[chain].packageName : support.packageName,
+        capabilityOk: support.ok,
+      },
     });
+
+    if (!support.ok) {
+      const msg = support.message;
+      logChainExecution({
+        operation: "wdk.transfer",
+        phase: "end",
+        chain,
+        durationMs: Math.round(performance.now() - t0),
+        ok: false,
+        error: msg,
+        detail: { asset, code: support.code },
+      });
+      throw new Error(msg);
+    }
 
     if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
       try {
@@ -366,7 +413,7 @@ export class ClawWdkBridge {
       }
     }
 
-    const msg = `Automated ${asset} send for ${chain} is not configured in this build — use EVM testnets first.`;
+    const msg = `Internal error: transfer path missing for ${chain} despite capability flag — check wdkRegistry vs ClawWdkBridge.`;
     logChainExecution({
       operation: "wdk.transfer",
       phase: "end",

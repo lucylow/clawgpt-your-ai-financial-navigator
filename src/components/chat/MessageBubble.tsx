@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import type { ChatCardPayload, Message } from "@/types";
 import { cn } from "@/lib/utils";
+import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
 
 interface MessageBubbleProps {
   message: Message;
@@ -28,6 +29,7 @@ export default function MessageBubble({
 
   return (
     <div
+      data-message-role={message.role}
       className={cn(
         "max-w-[90%] rounded-xl border text-sm shadow-sm transition-colors",
         isUser
@@ -44,68 +46,11 @@ export default function MessageBubble({
       ) : null}
 
       {message.card?.kind === "transaction_ready" && (
-        <div className="mt-3 rounded-lg border border-primary/30 bg-background/40 p-3 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Review & confirm</p>
-          <p className="text-foreground">
-            Send {message.card.amount} {message.card.asset} on {message.card.chain} → {message.card.toLabel}
-          </p>
-          {message.card.safety ? (
-            <div className="rounded-md border border-border/40 bg-secondary/20 px-2 py-2 space-y-1.5 text-[10px] text-muted-foreground">
-              <p className="font-semibold text-foreground/90 uppercase tracking-wide">Safety layers</p>
-              <p>
-                <span className="text-foreground/80">Approval gate:</span> {message.card.safety.approvalGate.reason}
-              </p>
-              <p>
-                <span className="text-foreground/80">Address:</span>{" "}
-                {message.card.safety.addressValidation.valid ? (
-                  <span className="text-emerald-400/90">Valid ({message.card.safety.addressValidation.chain})</span>
-                ) : (
-                  <span className="text-destructive/90">{message.card.safety.addressValidation.errors.join(" · ")}</span>
-                )}
-              </p>
-              <p>
-                <span className="text-foreground/80">Policy:</span>{" "}
-                {message.card.safety.policy.passed ? (
-                  <span className="text-emerald-400/90">Passed</span>
-                ) : (
-                  <span className="text-destructive/90">{message.card.safety.policy.violations.join(" · ")}</span>
-                )}
-              </p>
-              <p>
-                <span className="text-foreground/80">Simulation:</span> {message.card.safety.transactionSimulation.outcome}{" "}
-                · ~${message.card.safety.transactionSimulation.gasEstimateUsd.toFixed(2)} gas (model) —{" "}
-                {message.card.safety.transactionSimulation.summary}
-              </p>
-              {message.card.safety.actionPreview.steps.length > 0 ? (
-                <ul className="list-disc list-inside pt-0.5 text-[10px]">
-                  {message.card.safety.actionPreview.steps.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-          {message.card.feeEstimateUsd != null ? (
-            <p className="text-[11px] text-muted-foreground">
-              Est. gas / fees ~${message.card.feeEstimateUsd.toFixed(2)} · USDt on-chain after ~$
-              {message.card.usdtAfterOnChain?.toFixed(0) ?? "—"}
-            </p>
-          ) : null}
-          {message.card.reserveNote ? (
-            <p className="text-[10px] text-muted-foreground">{message.card.reserveNote}</p>
-          ) : null}
-          {message.card.toAddress ? (
-            <p className="text-[10px] text-muted-foreground font-mono break-all">To: {message.card.toAddress}</p>
-          ) : null}
-          <div className="flex gap-2 pt-1">
-            <Button
-              size="sm"
-              onClick={() => void onConfirmTransaction?.(message.card as Extract<ChatCardPayload, { kind: "transaction_ready" }>)}
-            >
-              {confirmTransactionLabel}
-            </Button>
-          </div>
-        </div>
+        <TransactionPreviewPanel
+          card={message.card}
+          confirmLabel={confirmTransactionLabel}
+          onConfirm={(card) => void onConfirmTransaction?.(card)}
+        />
       )}
 
       {message.card?.kind === "opportunity" && (

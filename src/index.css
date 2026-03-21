@@ -35,11 +35,25 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
+    /* Finance / status — calm, scannable (not neon) */
+    --success: 152 55% 42%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 88% 52%;
+    --warning-foreground: 222 47% 8%;
+    --pending: 43 74% 48%;
+    --pending-foreground: 222 47% 8%;
+    --info: 199 85% 48%;
+    --info-foreground: 210 40% 98%;
+
     --border: 220 40% 20%;
     --input: 220 40% 20%;
     --ring: 204 100% 50%;
 
     --radius: 0.75rem;
+
+    /* Layout rhythm (cockpit) — use via Tailwind spacing where possible */
+    --cockpit-gap: 0.75rem;
+    --cockpit-panel-pad: 1rem;
 
     --glass-bg: 222 26% 15%;
     --glass-border: 226 35% 35%;
@@ -199,5 +213,10 @@ html {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .motion-safe-hover {
+    transform: none !important;
+    transition: none !important;
   }
 }

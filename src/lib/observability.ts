@@ -309,3 +309,20 @@ export function initGlobalErrorHandlers(): void {
 export function trackPageView(path: string): void {
   trackInteraction("page_view", { path });
 }
+
+/** Latency / outcome for agent-chat turns (mock agent does not call this). */
+export function trackAgentChatTurn(metrics: {
+  ok: boolean;
+  latencyMs: number;
+  correlationId?: string;
+  errorCode?: string;
+  errorCategory?: string;
+}): void {
+  trackInteraction("agent_chat_turn", {
+    ok: metrics.ok,
+    latencyMs: Math.round(metrics.latencyMs),
+    correlationId: metrics.correlationId?.slice(0, 64),
+    errorCode: metrics.errorCode,
+    errorCategory: metrics.errorCategory,
+  });
+}

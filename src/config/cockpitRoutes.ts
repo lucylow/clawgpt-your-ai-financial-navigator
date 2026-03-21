@@ -19,7 +19,7 @@ export const COCKPIT_ROUTE_META: Record<
 > = {
   "/app": {
     title: "Dashboard",
-    description: "Agent chat and live portfolio metrics",
+    description: "Plain-language control for USDt and XAUt — balances, safe previews, and live activity",
   },
   "/app/chat": {
     title: "Agent",

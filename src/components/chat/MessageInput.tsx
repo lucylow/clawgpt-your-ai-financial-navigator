@@ -3,11 +3,11 @@ import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CHIPS = [
-  "Summarize portfolio movements",
-  "Suggest rebalancing to 65% USDt",
-  "Draft a transaction plan for yield",
-  "Explain gas on Arbitrum vs Ethereum",
-  "Compare bridge routes ETH → Arbitrum",
+  "How much USDt and XAUt do I have, and on which chains?",
+  "Summarize my recent activity and what moved",
+  "Preview a transfer — I want to see amount, chain, and fees first",
+  "Compare fees: sending on Ethereum vs Arbitrum",
+  "Is my portfolio too concentrated on one chain?",
 ] as const;
 
 interface MessageInputProps {
@@ -62,7 +62,7 @@ export default function MessageInput({ value, onChange, onSend, disabled }: Mess
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Ask Claw anything…"
+          placeholder="Ask in plain language — balances, previews, fees, routes…"
           rows={1}
           aria-describedby="chat-composer-hint"
           className={cn(

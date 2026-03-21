@@ -32,7 +32,9 @@ const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! I'm **Claw**, your AI financial assistant for the **ClawGPT Cockpit**. I can **summarize portfolio movements**, **suggest rebalancing**, **draft multi-step transaction plans**, **explain gas costs**, and **compare chain / bridge routes** — alongside transfers, swaps, and yield scans — wired to the dashboard on the right.\n\nTry the chips below or ask in natural language.",
+    "I'm **Claw**, your financial cockpit assistant for **USDt** (spending and liquidity) and **XAUt** (gold hedge) across multiple chains.\n\n" +
+    "**What I help with in real use:** see **where your value sits by chain**, get a **plain-language transfer preview** before anything is signed, **compare routes and fees**, and **track activity** alongside the live ticker.\n\n" +
+    "You do not need to be a chain expert — ask in everyday language. **Sends and bridges always need your explicit confirmation** (and wallet approval when using WDK).",
 };
 
 export default function ChatInterface() {
@@ -48,6 +50,8 @@ export default function ChatInterface() {
   const appendAgentWorkflow = usePortfolioStore((s) => s.appendAgentWorkflow);
   const clearAgentWorkflow = usePortfolioStore((s) => s.clearAgentWorkflow);
   const appendDecisionAudit = usePortfolioStore((s) => s.appendDecisionAudit);
+  const incrementSessionImpact = usePortfolioStore((s) => s.incrementSessionImpact);
+  const sessionImpact = usePortfolioStore((s) => s.agent.sessionImpact);
   const workflowLog = usePortfolioStore((s) => s.agent.workflowLog);
   const decisionAudit = usePortfolioStore((s) => s.agent.decisionAudit ?? []);
   const walletMode = useDemoStore((s) => s.walletMode);
@@ -58,6 +62,8 @@ export default function ChatInterface() {
   const { toast } = useToast();
 
   const wdkLive = walletMode === "wdk" && isRealWdkSession();
+  const focusChain = useCockpitChainStore((s) => s.focusChain);
+  const chainCtx = COCKPIT_CHAIN_META[focusChain];
   const confirmLabels = useMemo(
     () => ({
       transaction: wdkLive ? "Preview OK — submit via WDK" : "Confirm (simulated portfolio)",
@@ -65,6 +71,19 @@ export default function ChatInterface() {
     }),
     [wdkLive],
   );
+
+  const sessionImpactLine = useMemo(() => {
+    const s = sessionImpact;
+    if (!s.userTurns && !s.structuredPreviews && !s.confirmedActions && !s.preventedMistakes) {
+      return null;
+    }
+    const parts: string[] = [];
+    if (s.userTurns) parts.push(`${s.userTurns} question${s.userTurns === 1 ? "" : "s"}`);
+    if (s.structuredPreviews) parts.push(`${s.structuredPreviews} structured preview${s.structuredPreviews === 1 ? "" : "s"}`);
+    if (s.confirmedActions) parts.push(`${s.confirmedActions} confirmed`);
+    if (s.preventedMistakes) parts.push(`${s.preventedMistakes} stopped for safety`);
+    return parts.join(" · ");
+  }, [sessionImpact]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -97,12 +116,13 @@ export default function ChatInterface() {
     (partial: Omit<Transaction, "hash" | "timestamp">) => {
       const tx: Transaction = {
         ...partial,
-        hash: "0x" + Math.random().toString(16).slice(2, 10) + "…",
+        /** Not an on-chain hash — demo ticker only (WDK path uses real tx hashes). */
+        hash: `demo:${conversationId}:${Date.now().toString(36)}`,
         timestamp: Date.now(),
       };
       applyAgentUpdate({ type: "add_transaction", tx });
     },
-    [applyAgentUpdate]
+    [applyAgentUpdate, conversationId]
   );
 
   const onConfirmTransaction = useCallback(
@@ -383,6 +403,7 @@ export default function ChatInterface() {
     const text = input.trim();
     if (!text || isThinking) return;
 
+    incrementSessionImpact("userTurns");
     setError(null);
     const userMsg: Message = { id: generateId(), role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -420,6 +441,10 @@ export default function ChatInterface() {
         applyAgentUpdate(result.portfolioUpdate);
       }
 
+      if (result.card) {
+        incrementSessionImpact("structuredPreviews");
+      }
+
       const assistantMsg: Message = {
         id: generateId(),
         role: "assistant",
@@ -452,6 +477,7 @@ export default function ChatInterface() {
     conversationId,
     applyAgentUpdate,
     appendAgentWorkflow,
+    incrementSessionImpact,
     setAgentIntent,
     setAgentError,
     toast,
@@ -474,20 +500,26 @@ export default function ChatInterface() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground">Claw</p>
-          <p className="text-xs text-muted-foreground">
+          <p
+            className="text-xs text-muted-foreground"
+            aria-live="polite"
+          >
             <span className="inline-flex items-center gap-1.5">
               <span
-                className={`inline-block h-1.5 w-1.5 rounded-full ${isThinking ? "shrink-0 bg-amber-400 animate-pulse" : "shrink-0 bg-emerald-400"}`}
+                className={`inline-block h-1.5 w-1.5 rounded-full ${isThinking ? "shrink-0 bg-pending animate-pulse" : "shrink-0 bg-success"}`}
                 aria-hidden
               />
               <span className="text-primary">
                 {isThinking
-                  ? "Thinking…"
+                  ? "Analyzing…"
                   : wdkLive
                     ? `Online · WDK · ${chainCtx.label} (${chainCtx.network})`
-                    : "Online · mock or Supabase"}
+                    : "Online · demo / Supabase"}
               </span>
             </span>
+            {sessionImpactLine ? (
+              <span className="mt-0.5 block text-[10px] text-muted-foreground/95">{sessionImpactLine}</span>
+            ) : null}
           </p>
         </div>
         <button

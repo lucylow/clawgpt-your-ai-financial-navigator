@@ -18,7 +18,7 @@
 2. Open `http://localhost:8080` and click **Use Demo Wallet** (no Supabase sign-in, no API keys)
 3. The cockpit loads a **mock 6-chain portfolio**; chat **show portfolio** and watch the dashboard and ticker
 
-**Docs:** [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+**Docs:** [AGENTS.md](AGENTS.md) · [docs/WDK.md](docs/WDK.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) · [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 
 **Boundaries:** `src/lib/agentClient.ts` (`sendMessage`) · `src/lib/walletClient.ts` (WDK-ready stubs)
 

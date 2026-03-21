@@ -6,9 +6,17 @@ import type {
   AgentPortfolioUpdate,
   AgentSliceState,
   NestedAllocation,
+  SessionImpactV1,
   Transaction,
   WalletEntry,
 } from "@/types";
+
+const DEFAULT_SESSION_IMPACT: SessionImpactV1 = {
+  userTurns: 0,
+  structuredPreviews: 0,
+  confirmedActions: 0,
+  preventedMistakes: 0,
+};
 
 interface PortfolioState {
   totalValue: number;
@@ -47,6 +55,7 @@ interface PortfolioState {
   appendAgentWorkflow: (phase: AgentWorkflowPhase, detail: string) => void;
   clearAgentWorkflow: () => void;
   appendDecisionAudit: (entry: Omit<DecisionAuditEntry, "at"> & { at?: number }) => void;
+  incrementSessionImpact: (key: "userTurns" | "structuredPreviews") => void;
   setPortfolioSyncError: (message: string | null) => void;
   clearError: () => void;
 }
@@ -123,7 +132,13 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
   wallets: demoWallets,
   error: null,
   portfolioSyncError: null,
-  agent: { lastIntent: null, lastError: null, workflowLog: [], decisionAudit: [] },
+  agent: {
+    lastIntent: null,
+    lastError: null,
+    workflowLog: [],
+    decisionAudit: [],
+    sessionImpact: { ...DEFAULT_SESSION_IMPACT },
+  },
 
   hydrateDemoPortfolio: (payload) => {
     set({
@@ -264,12 +279,23 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
   appendDecisionAudit: (entry) =>
     set((s) => {
       const row: DecisionAuditEntry = { ...entry, at: entry.at ?? Date.now() };
+      const si: SessionImpactV1 = { ...DEFAULT_SESSION_IMPACT, ...s.agent.sessionImpact };
+      if (row.kind === "rejection") si.preventedMistakes += 1;
+      if (row.kind === "execution") si.confirmedActions += 1;
       return {
         agent: {
           ...s.agent,
           decisionAudit: [...(s.agent.decisionAudit ?? []), row].slice(-40),
+          sessionImpact: si,
         },
       };
+    }),
+
+  incrementSessionImpact: (key) =>
+    set((s) => {
+      const si: SessionImpactV1 = { ...DEFAULT_SESSION_IMPACT, ...s.agent.sessionImpact };
+      si[key] += 1;
+      return { agent: { ...s.agent, sessionImpact: si } };
     }),
 
   appendAgentWorkflow: (phase, detail) =>
@@ -282,7 +308,12 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
 
   clearAgentWorkflow: () =>
     set((s) => ({
-      agent: { ...s.agent, workflowLog: [], decisionAudit: [] },
+      agent: {
+        ...s.agent,
+        workflowLog: [],
+        decisionAudit: [],
+        sessionImpact: { ...DEFAULT_SESSION_IMPACT },
+      },
     })),
 
   setPortfolioSyncError: (message) => set({ portfolioSyncError: message }),

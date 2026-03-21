@@ -115,6 +115,17 @@ export interface WalletEntry {
   nativeSymbol?: string;
 }
 
+/** Lightweight session metrics: proves assist value beyond spectacle (turns, previews, safety). */
+export interface SessionImpactV1 {
+  userTurns: number;
+  /** Assistant replies that included a structured card (transfer / opportunity / plan). */
+  structuredPreviews: number;
+  /** User completed a confirmed on-chain or demo execution path. */
+  confirmedActions: number;
+  /** Policy / safety / validation stopped a risky path. */
+  preventedMistakes: number;
+}
+
 export interface AgentSliceState {
   lastIntent: string | null;
   lastError: string | null;
@@ -122,4 +133,6 @@ export interface AgentSliceState {
   workflowLog: AgentWorkflowEntry[];
   /** Cost-aware decision log (recommendations / holds / executions) */
   decisionAudit?: DecisionAuditEntry[];
+  /** Per-chat-session counters; reset when the user clears the workflow log. */
+  sessionImpact: SessionImpactV1;
 }

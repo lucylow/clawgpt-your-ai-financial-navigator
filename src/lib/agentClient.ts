@@ -1,4 +1,6 @@
 import { streamAgentMessage, type AgentMetadata } from "@/lib/agent";
+import { trackAgentChatTurn } from "@/lib/observability";
+import { isSupabaseConfigured } from "@/lib/supabaseEnv";
 import { buildDemoTransferSafety, buildSafetyFromAgentMetadata } from "@/lib/agentSafety";
 import { assetRoleLabel } from "@/lib/economics/assetRoles";
 import { estimateSwapSlippage } from "@/lib/economics/executionCost";
@@ -52,12 +54,23 @@ function transactionCardFromMetadata(metadata: AgentMetadata | undefined): ChatC
   };
 }
 
-function isMockAgent(): boolean {
-  const flag = import.meta.env.VITE_USE_MOCK_AGENT;
-  if (flag === "false") return false;
+/**
+ * Resolves whether to use the local mock agent vs Supabase `agent-chat`.
+ * - Explicit `VITE_USE_MOCK_AGENT=true` → mock (offline demos).
+ * - Explicit `false` → live edge (requires LOVABLE_API_KEY on the function).
+ * - Unset: live when Supabase URL + anon key are present; otherwise mock so the app works without backend.
+ */
+export function resolveMockAgentPreference(
+  flag: string | undefined,
+  supabaseConfigured: boolean,
+): boolean {
   if (flag === "true") return true;
-  // Default: mock for hackathon / judge demos. Set VITE_USE_MOCK_AGENT=false to use Supabase agent-chat.
-  return true;
+  if (flag === "false") return false;
+  return !supabaseConfigured;
+}
+
+function isMockAgent(): boolean {
+  return resolveMockAgentPreference(import.meta.env.VITE_USE_MOCK_AGENT, isSupabaseConfigured);
 }
 
 function delay(ms: number) {
@@ -378,26 +391,54 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
   };
 }
 
+function newIdempotencyKey(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
 async function streamToResult(
   content: string,
   history: HistoryMessage[]
 ): Promise<AgentClientResult> {
   let text = "";
   let metadata: AgentMetadata | undefined;
+  const idempotencyKey = newIdempotencyKey();
+  const correlationId = newIdempotencyKey();
+  const t0 = Date.now();
 
-  await new Promise<void>((resolve, reject) => {
-    streamAgentMessage({
-      content,
-      history,
-      onDelta: (t) => {
-        text += t;
-      },
-      onMetadata: (m) => {
-        metadata = m;
-      },
-      onDone: () => resolve(),
-      onError: (e) => reject(new Error(e)),
+  try {
+    await new Promise<void>((resolve, reject) => {
+      streamAgentMessage({
+        content,
+        history,
+        idempotencyKey,
+        correlationId,
+        onDelta: (t) => {
+          text += t;
+        },
+        onMetadata: (m) => {
+          metadata = m;
+        },
+        onDone: () => resolve(),
+        onError: (e) => reject(new Error(e)),
+      });
     });
+  } catch (e) {
+    trackAgentChatTurn({
+      ok: false,
+      latencyMs: Date.now() - t0,
+      correlationId,
+    });
+    throw e;
+  }
+
+  trackAgentChatTurn({
+    ok: true,
+    latencyMs: Date.now() - t0,
+    correlationId: metadata?.correlationId ?? correlationId,
   });
 
   const portfolioUpdate = shouldApplyPortfolioMetadata(metadata)

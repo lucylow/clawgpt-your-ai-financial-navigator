@@ -1,14 +1,16 @@
 import { useMemo } from "react";
-import { Activity, Layers, Wallet } from "lucide-react";
+import { Activity, Compass, Layers, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import CockpitGlobe from "./CockpitGlobe";
 import PortfolioChart from "./PortfolioChart";
 import ChainHeatmap from "./ChainHeatmap";
 import CockpitInsightPanels from "./CockpitInsightPanels";
 import Ticker from "./Ticker";
+import { MetricTile } from "./MetricTile";
 
 export default function CockpitDashboard() {
-  const { totalValue, allocation, allocationByAsset } = usePortfolioStore();
+  const { totalValue, allocation, allocationByAsset, agent } = usePortfolioStore();
+  const sessionImpact = agent.sessionImpact;
 
   const safeTotalValue = Number.isFinite(totalValue) && totalValue >= 0 ? totalValue : 0;
 
@@ -16,6 +18,41 @@ export default function CockpitDashboard() {
     () => Object.entries(allocation).filter(([, v]) => v > 0).length,
     [allocation]
   );
+
+  const nextStepContent = useMemo(() => {
+    if (safeTotalValue <= 0) {
+      return (
+        <>
+          Connect a wallet or use demo mode, then ask Claw for a balance breakdown by chain.
+        </>
+      );
+    }
+    const entries = Object.entries(allocation).filter(([, v]) => v > 0);
+    if (entries.length === 0) {
+      return <>Ask Claw where your USDt and XAUt sit — the map and ticker update as you act.</>;
+    }
+    const top = entries.reduce((a, b) => (a[1] >= b[1] ? a : b));
+    const share = top[1] / safeTotalValue;
+    if (share > 0.55) {
+      return (
+        <>
+          Most of your balance is on <strong className="text-foreground/90">{top[0]}</strong> — ask Claw whether to
+          rebalance or compare fees before moving funds.
+        </>
+      );
+    }
+    return (
+      <>
+        Ask Claw for a quick transfer <strong className="text-foreground/90">preview</strong> (amount, chain, fees)
+        before you sign anything.
+      </>
+    );
+  }, [allocation, safeTotalValue]);
+
+  const hasSessionStats = useMemo(() => {
+    const s = sessionImpact;
+    return Boolean(s.userTurns || s.structuredPreviews || s.confirmedActions || s.preventedMistakes);
+  }, [sessionImpact]);
 
   const { usdtNav, xautNav, usdtPct, xautPct } = useMemo(() => {
     let u = 0;
@@ -39,40 +76,75 @@ export default function CockpitDashboard() {
       <header className="flex flex-col gap-1 shrink-0">
         <h2 className="text-sm font-semibold text-foreground tracking-tight">Operational overview</h2>
         <p className="text-xs text-muted-foreground">
-          Live allocation, chain exposure, and activity — synced with Claw and your wallet state.
+          One place to see allocation, chain exposure, and activity — built for decisions, not just charts.
         </p>
       </header>
 
+      <section
+        aria-labelledby="cockpit-next-step-heading"
+        className="rounded-xl border border-border/40 bg-secondary/15 px-3 py-2.5 sm:px-4"
+      >
+        <div className="flex items-start gap-2">
+          <Compass className="h-4 w-4 shrink-0 text-primary mt-0.5" aria-hidden />
+          <div className="min-w-0">
+            <h2 id="cockpit-next-step-heading" className="text-xs font-semibold text-foreground">
+              Suggested next step
+            </h2>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-snug">{nextStepContent}</p>
+          </div>
+        </div>
+      </section>
+
+      {hasSessionStats ? (
+        <section
+          aria-label="Assistant session value"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3"
+        >
+          <div className="rounded-lg border border-border/30 bg-background/30 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary/90" aria-hidden />
+              Questions
+            </div>
+            <p className="text-lg font-semibold tabular-nums text-foreground">{sessionImpact.userTurns}</p>
+          </div>
+          <div className="rounded-lg border border-border/30 bg-background/30 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <Activity className="h-3 w-3 text-sky-400/90" aria-hidden />
+              Previews
+            </div>
+            <p className="text-lg font-semibold tabular-nums text-foreground">{sessionImpact.structuredPreviews}</p>
+          </div>
+          <div className="rounded-lg border border-border/30 bg-background/30 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <Wallet className="h-3 w-3 text-emerald-400/90" aria-hidden />
+              Confirmed
+            </div>
+            <p className="text-lg font-semibold tabular-nums text-foreground">{sessionImpact.confirmedActions}</p>
+          </div>
+          <div className="rounded-lg border border-border/30 bg-background/30 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <ShieldCheck className="h-3 w-3 text-amber-400/90" aria-hidden />
+              Stopped (safety)
+            </div>
+            <p className="text-lg font-semibold tabular-nums text-foreground">{sessionImpact.preventedMistakes}</p>
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-        <div className="glass-card rounded-lg px-4 py-3 flex items-start gap-3">
-          <div className="mt-0.5 rounded-md bg-primary/15 p-2 text-primary">
-            <Wallet className="h-4 w-4" aria-hidden />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net portfolio</p>
-            <p className="text-lg font-semibold tabular-nums">${safeTotalValue.toLocaleString()}</p>
-          </div>
-        </div>
-        <div className="glass-card rounded-lg px-4 py-3 flex items-start gap-3">
-          <div className="mt-0.5 rounded-md bg-emerald-500/15 p-2 text-emerald-400">
-            <Layers className="h-4 w-4" aria-hidden />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Active chains</p>
-            <p className="text-lg font-semibold tabular-nums">{activeChains}</p>
-          </div>
-        </div>
-        <div className="glass-card rounded-lg px-4 py-3 flex items-start gap-3">
-          <div className="mt-0.5 rounded-md bg-amber-500/15 p-2 text-amber-400">
-            <Activity className="h-4 w-4" aria-hidden />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USDt / XAUt mix</p>
-            <p className="text-lg font-semibold tabular-nums">
-              {usdtPct.toFixed(0)}% / {xautPct.toFixed(0)}%
-            </p>
-          </div>
-        </div>
+        <MetricTile label="Net portfolio" icon={Wallet} value={`$${safeTotalValue.toLocaleString()}`} />
+        <MetricTile
+          label="Active chains"
+          icon={Layers}
+          value={activeChains}
+          iconClassName="bg-emerald-500/15 text-emerald-400"
+        />
+        <MetricTile
+          label="USDt / XAUt mix"
+          icon={Activity}
+          value={`${usdtPct.toFixed(0)}% / ${xautPct.toFixed(0)}%`}
+          iconClassName="bg-amber-500/15 text-amber-400"
+        />
       </div>
 
       <section aria-labelledby="cockpit-globe-metrics-heading" className="space-y-2">
