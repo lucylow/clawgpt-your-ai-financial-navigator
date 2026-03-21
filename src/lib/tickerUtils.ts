@@ -20,7 +20,7 @@ function hashToGasUsd(hash: string): string {
 }
 
 function mapPortfolioType(t: Transaction["type"]): TickerTxType {
-  switch (t.type) {
+  switch (t) {
     case "send":
       return "sent";
     case "receive":
