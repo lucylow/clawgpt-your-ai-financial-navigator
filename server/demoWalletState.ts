@@ -42,12 +42,12 @@ export interface DemoWalletState {
 }
 
 const INITIAL_BALANCES: Record<string, Record<string, number>> = {
-  ethereum: { USDT: 5234.12, XAUt: 0.023 },
-  polygon: { USDT: 2891.45, "USDT.e": 500 },
-  arbitrum: { USDT: 2150.67 },
-  solana: { USDT: 890.23 },
-  tron: { USDT: 234.56 },
-  ton: { USDT: 53.41 },
+  ethereum: { USDT: 6120.4, XAUt: 0.22 },
+  polygon: { USDT: 3012.9, "USDT.e": 500, XAUt: 118.6 },
+  arbitrum: { USDT: 2288.55, XAUt: 0.08 },
+  solana: { USDT: 1120.4, XAUt: 0.05 },
+  tron: { USDT: 312.8 },
+  ton: { USDT: 86.5 },
 };
 
 function deepCloneBalances(src: Record<string, Record<string, number>>): Record<string, Record<string, number>> {
@@ -58,7 +58,7 @@ function deepCloneBalances(src: Record<string, Record<string, number>>): Record<
   return out;
 }
 
-function seedTransactions(address: string): DemoTransaction[] {
+function seedTransactions(_address: string): DemoTransaction[] {
   const now = Date.now();
   return [
     createMockTransaction({
@@ -90,6 +90,116 @@ function seedTransactions(address: string): DemoTransaction[] {
       toAddress: "0xself",
       status: "confirmed",
       timestamp: now - 14400000,
+    }),
+    createMockTransaction({
+      type: "bridge",
+      amount: 300,
+      asset: "USDT",
+      fromChain: "polygon",
+      toChain: "solana",
+      toAddress: "9WzD…",
+      status: "confirmed",
+      timestamp: now - 26000000,
+    }),
+    createMockTransaction({
+      type: "swap",
+      amount: 500,
+      asset: "USDT",
+      fromChain: "solana",
+      toChain: "solana",
+      toAddress: "pool",
+      status: "confirmed",
+      timestamp: now - 21600000,
+    }),
+    createMockTransaction({
+      type: "receive",
+      amount: 1000,
+      asset: "USDT",
+      fromChain: "arbitrum",
+      toChain: "arbitrum",
+      toAddress: "0xself",
+      status: "confirmed",
+      timestamp: now - 42000000,
+    }),
+    createMockTransaction({
+      type: "send",
+      amount: 18.5,
+      asset: "XAUt",
+      fromChain: "ethereum",
+      toChain: "ethereum",
+      toAddress: "0xvault…",
+      status: "confirmed",
+      timestamp: now - 108500000,
+    }),
+    createMockTransaction({
+      type: "bridge",
+      amount: 95,
+      asset: "USDT",
+      fromChain: "tron",
+      toChain: "ethereum",
+      toAddress: "0xself",
+      status: "pending",
+      timestamp: now - 110000000,
+    }),
+    createMockTransaction({
+      type: "swap",
+      amount: 220,
+      asset: "USDT",
+      fromChain: "arbitrum",
+      toChain: "arbitrum",
+      toAddress: "0xcamelot…",
+      status: "confirmed",
+      timestamp: now - 112500000,
+    }),
+    createMockTransaction({
+      type: "receive",
+      amount: 2100,
+      asset: "USDT",
+      fromChain: "ethereum",
+      toChain: "ethereum",
+      toAddress: "0xself",
+      status: "confirmed",
+      timestamp: now - 124500000,
+    }),
+    createMockTransaction({
+      type: "bridge",
+      amount: 55,
+      asset: "USDT",
+      fromChain: "solana",
+      toChain: "tron",
+      toAddress: "Tbridge…",
+      status: "failed",
+      timestamp: now - 135000000,
+    }),
+    createMockTransaction({
+      type: "send",
+      amount: 125,
+      asset: "USDT",
+      fromChain: "ton",
+      toChain: "ton",
+      toAddress: "dedust…",
+      status: "confirmed",
+      timestamp: now - 131500000,
+    }),
+    createMockTransaction({
+      type: "receive",
+      amount: 450,
+      asset: "USDT",
+      fromChain: "arbitrum",
+      toChain: "arbitrum",
+      toAddress: "0xself",
+      status: "confirmed",
+      timestamp: now - 106000000,
+    }),
+    createMockTransaction({
+      type: "send",
+      amount: 500,
+      asset: "USDT",
+      fromChain: "ethereum",
+      toChain: "ethereum",
+      toAddress: "0xgnosis…",
+      status: "confirmed",
+      timestamp: now - 142000000,
     }),
   ];
 }

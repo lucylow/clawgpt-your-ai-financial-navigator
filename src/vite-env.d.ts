@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Supabase project URL (Edge Functions base: `{url}/functions/v1/...`). */
+  readonly VITE_SUPABASE_URL?: string;
+  /** Supabase anon / publishable key — used by the JS client and `agent-chat` invoke. */
+  readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   /** Optional HTTPS endpoint that accepts POST `{ events: ObservabilityEvent[] }` JSON batches. */
   readonly VITE_OBSERVABILITY_INGEST_URL?: string;
   /** Optional public path when the app is not served at domain root (read in vite.config only). */

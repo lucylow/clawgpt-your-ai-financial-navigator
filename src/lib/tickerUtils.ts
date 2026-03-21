@@ -61,7 +61,7 @@ export function mapPortfolioTransaction(tx: Transaction, now = Date.now()): Tick
   };
 }
 
-const DEMO_CHAINS = ["ethereum", "polygon", "arbitrum", "solana"] as const;
+const DEMO_CHAINS = ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"] as const;
 const DEMO_ASSETS = ["USDt", "XAUt"] as const;
 
 export function mockTickerTransaction(): TickerTransaction {

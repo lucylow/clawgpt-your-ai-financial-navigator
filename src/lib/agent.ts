@@ -1,4 +1,9 @@
-import { isSupabaseConfigured, supabaseEnvKey, supabaseEnvUrl } from "@/lib/supabaseEnv";
+import {
+  isSupabaseConfigured,
+  supabaseEdgeFunctionHeaders,
+  supabaseEdgeFunctionUrl,
+  supabaseEnvKey,
+} from "@/lib/supabaseEnv";
 import { loadConversation, saveChatMessage as persistChatMessage } from "@/services/chatMessages.service";
 import type { AgentSafetyEnvelope } from "@/lib/agentSafety";
 
@@ -51,16 +56,19 @@ export async function streamAgentMessage({
     return;
   }
 
-  const baseUrl = supabaseEnvUrl ?? "";
   const anonKey = supabaseEnvKey ?? "";
-  const url = `${baseUrl.replace(/\/$/, "")}/functions/v1/agent-chat`;
+  const url = supabaseEdgeFunctionUrl("agent-chat");
+  if (!url) {
+    onError("Chat is not configured (missing Supabase URL).");
+    return;
+  }
 
   try {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${anonKey}`,
+        ...supabaseEdgeFunctionHeaders(anonKey),
       },
       body: JSON.stringify({
         message: content.trim(),
@@ -69,7 +77,7 @@ export async function streamAgentMessage({
     });
 
     // Handle non-streaming JSON responses (success or structured errors)
-    const contentType = resp.headers.get("content-type") || "";
+    const contentType = (resp.headers.get("content-type") || "").toLowerCase();
     if (contentType.includes("application/json")) {
       let data: Record<string, unknown>;
       try {
@@ -103,8 +111,26 @@ export async function streamAgentMessage({
     }
 
     if (!resp.ok || !resp.body) {
+      let extra = "";
+      try {
+        const t = await resp.text();
+        if (t) {
+          try {
+            const j = JSON.parse(t) as Record<string, unknown>;
+            extra =
+              (typeof j.text === "string" && j.text) ||
+              (typeof j.message === "string" && j.message) ||
+              (typeof j.error === "string" && j.error) ||
+              "";
+          } catch {
+            extra = t.length > 280 ? `${t.slice(0, 280)}…` : t;
+          }
+        }
+      } catch {
+        /* use status-only message */
+      }
       const statusMsg = !resp.ok ? `Agent returned ${resp.status}.` : "Empty response from agent.";
-      onError(`${statusMsg} Please try again.`);
+      onError(extra || `${statusMsg} Please try again.`);
       return;
     }
 
