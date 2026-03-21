@@ -20,7 +20,7 @@ function hashToGasUsd(hash: string): string {
 }
 
 function mapPortfolioType(t: Transaction["type"]): TickerTxType {
-  switch (t.type) {
+  switch (t) {
     case "send":
       return "sent";
     case "receive":
@@ -40,7 +40,7 @@ function primaryChain(t: Transaction): string {
 }
 
 export function mapPortfolioTransaction(tx: Transaction, now = Date.now()): TickerTransaction {
-  const type = mapPortfolioType(tx);
+  const type = mapPortfolioType(tx.type);
   const chain = primaryChain(tx);
   const chainTo =
     tx.type === "bridge" && tx.fromChain !== tx.toChain ? tx.toChain : undefined;

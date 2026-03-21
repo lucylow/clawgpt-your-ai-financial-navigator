@@ -64,7 +64,7 @@ export default function MessageBubble({
           <div className="flex gap-2 pt-1">
             <Button
               size="sm"
-              onClick={() => void onConfirmTransaction?.(message.card)}
+              onClick={() => void onConfirmTransaction?.(message.card as Extract<ChatCardPayload, { kind: "transaction_ready" }>)}
             >
               {confirmTransactionLabel}
             </Button>
@@ -132,7 +132,7 @@ export default function MessageBubble({
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => void onConfirmOpportunity?.(message.card!)}
+            onClick={() => void onConfirmOpportunity?.(message.card as Extract<ChatCardPayload, { kind: "opportunity" }>)}
           >
             {confirmOpportunityLabel}
           </Button>

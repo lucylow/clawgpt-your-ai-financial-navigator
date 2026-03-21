@@ -114,8 +114,9 @@ export default function ChatInterface() {
         gasEstimateUsd: card.feeEstimateUsd ?? 2.5,
       });
       if (!spend.ok) {
-        toast({ variant: "destructive", title: "Blocked", description: spend.reason });
-        appendDecisionAudit({ kind: "rejection", summary: spend.reason, detail: { card } });
+        const reason = (spend as { reason: string }).reason;
+        toast({ variant: "destructive", title: "Blocked", description: reason });
+        appendDecisionAudit({ kind: "rejection", summary: reason, detail: { card } });
         appendAgentWorkflow("execute", "Aborted: spend policy");
         return;
       }
@@ -167,8 +168,9 @@ export default function ChatInterface() {
           asset: card.asset === "XAUt" ? "XAUt" : "USDt",
         });
         if (!res.ok) {
-          toast({ variant: "destructive", title: "Transfer failed", description: res.error });
-          appendAgentWorkflow("execute", `Failed: ${res.error}`);
+          const errMsg = (res as { error: string }).error;
+          toast({ variant: "destructive", title: "Transfer failed", description: errMsg });
+          appendAgentWorkflow("execute", `Failed: ${errMsg}`);
           return;
         }
         const tx: Transaction = {
@@ -243,8 +245,9 @@ export default function ChatInterface() {
         expectedBenefitUsd: card.policyBenefitUsd,
       });
       if (!gate.ok) {
-        toast({ variant: "destructive", title: "Not executed", description: gate.reason });
-        appendDecisionAudit({ kind: "rejection", summary: gate.reason, detail: { card } });
+        const reason = (gate as { reason: string }).reason;
+        toast({ variant: "destructive", title: "Not executed", description: reason });
+        appendDecisionAudit({ kind: "rejection", summary: reason, detail: { card } });
         appendAgentWorkflow("execute", "Aborted: policy gate");
         return;
       }
