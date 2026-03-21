@@ -10,6 +10,7 @@ import {
   refreshLivePortfolio,
   sendTransaction,
 } from "@/lib/walletClient";
+import { createUserConfirmedIntent } from "@/lib/securityModel";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { useDemoStore } from "@/store/useDemoStore";
 import { useAuth } from "@/hooks/useAuth";

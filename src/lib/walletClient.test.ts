@@ -9,12 +9,15 @@ describe("walletClient sendTransaction", () => {
     const wdk = await import("@/lib/wdkClient");
     vi.spyOn(wdk.clawWdk, "isReady").mockReturnValue(false);
     const { sendTransaction } = await import("@/lib/walletClient");
-    const r = await sendTransaction({
-      chain: "ethereum",
-      to: "0x0000000000000000000000000000000000000001",
-      amount: "1",
-      asset: "USDt",
-    });
+    const r = await sendTransaction(
+      {
+        chain: "ethereum",
+        to: "0x0000000000000000000000000000000000000001",
+        amount: "1",
+        asset: "USDt",
+      },
+      { kind: "user_confirmed", confirmedAtMs: Date.now() },
+    );
     expect(r.ok).toBe(false);
     if (!r.ok) expect((r as { code: string }).code).toBe("WALLET_NOT_READY");
   });
