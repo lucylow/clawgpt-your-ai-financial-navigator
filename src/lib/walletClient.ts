@@ -5,9 +5,8 @@
  * WDK packages are loaded asynchronously so the public landing route does not evaluate
  * heavy native/crypto stacks (avoids blank pages on Lovable and similar previews).
  */
-import type { WdkChainId } from "@/config/chains";
-import { SUPPORTED_WDK_CHAINS } from "@/config/chains";
-import { DEMO_SESSION_KEY, WALLET_MODE_KEY, WDK_SEED_SESSION_KEY } from "@/lib/demoWallet";
+import { SUPPORTED_WDK_CHAINS, type WdkChainId } from "@/config/chains";
+import { isWalletSessionActive, WALLET_MODE_KEY, WDK_SEED_SESSION_KEY } from "@/lib/demoWallet";
 import type { UserConfirmedChainIntent } from "@/lib/securityModel";
 import { getQueryClient } from "@/lib/queryClientSingleton";
 import { queryKeys } from "@/lib/queryKeys";
@@ -15,12 +14,23 @@ import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { logChainExecution } from "@/lib/observability";
 import { formatGasSummary, simulateTetherEvmTransfer } from "@/lib/evmSimulation";
 import { classifyWalletError } from "@/lib/web3Errors";
-import { getRuntimeCapabilities, getTetherTransferSupport } from "@/lib/wdkRegistry";
+import { getRuntimeCapabilities, getTetherTransferSupport, isWdkChainId } from "@/lib/wdkRegistry";
 
 type WdkModule = typeof import("@/lib/wdkClient");
 
 let wdkModulePromise: Promise<WdkModule> | null = null;
 let wdkModuleCache: WdkModule | null = null;
+
+/** Only return balances when the query address matches the WDK signer for that chain (EVM compared case-insensitively). */
+function queryAddressMatchesSigner(chain: string, requested: string, signerAddress: string): boolean {
+  const r = requested.trim();
+  const a = signerAddress.trim();
+  if (!r || !a) return false;
+  if (chain === "ethereum" || chain === "polygon" || chain === "arbitrum") {
+    return r.toLowerCase() === a.toLowerCase();
+  }
+  return r === a;
+}
 
 async function loadWdkModule(): Promise<WdkModule> {
   if (wdkModuleCache) return wdkModuleCache;
@@ -52,7 +62,7 @@ export interface BalanceQuery {
   address: string;
 }
 
-export type ConnectDemoWalletResult = {
+export type ConnectWalletResult = {
   success: boolean;
   wallet?: {
     address: string;
@@ -63,15 +73,20 @@ export type ConnectDemoWalletResult = {
   error?: string;
 };
 
-function readWalletMode(): "wdk" | "demo" {
+/** @deprecated Use ConnectWalletResult */
+export type ConnectDemoWalletResult = ConnectWalletResult;
+
+function readWalletMode(): "wdk" | "local" {
   try {
-    return sessionStorage.getItem(WALLET_MODE_KEY) === "wdk" ? "wdk" : "demo";
+    const raw = sessionStorage.getItem(WALLET_MODE_KEY);
+    if (raw === "wdk") return "wdk";
+    return "local";
   } catch {
-    return "demo";
+    return "local";
   }
 }
 
-export function getWalletMode(): "wdk" | "demo" {
+export function getWalletMode(): "wdk" | "local" {
   return readWalletMode();
 }
 
@@ -95,9 +110,9 @@ export function disconnectWalletSession(): void {
 }
 
 /**
- * Same entry point name as the old demo helper — now wires a real WDK session when `VITE_USE_WDK` is enabled.
+ * Primary connect: Tether WDK multi-chain session when `VITE_USE_WDK` is enabled.
  */
-export async function connectDemoWallet(seedOverride?: string): Promise<ConnectDemoWalletResult> {
+export async function connectWallet(seedOverride?: string): Promise<ConnectWalletResult> {
   if (import.meta.env.VITE_USE_WDK === "false") {
     return { success: false, error: "WDK disabled (VITE_USE_WDK=false)" };
   }
@@ -115,6 +130,13 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
       sessionStorage.setItem(WALLET_MODE_KEY, "wdk");
     }
     const primary = await clawWdk.getPrimaryAddress();
+    logChainExecution({
+      operation: "wallet.session_connect",
+      phase: "end",
+      durationMs: Math.round(performance.now() - t0),
+      ok: true,
+      detail: { chains: SUPPORTED_WDK_CHAINS.length },
+    });
     return {
       success: true,
       mnemonic: phrase,
@@ -125,6 +147,13 @@ export async function connectDemoWallet(seedOverride?: string): Promise<ConnectD
       },
     };
   } catch (e) {
+    logChainExecution({
+      operation: "wallet.session_connect",
+      phase: "end",
+      durationMs: Math.round(performance.now() - t0),
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    });
     disconnectWalletSession();
     return {
       success: false,
@@ -142,7 +171,7 @@ export async function refreshLivePortfolio(): Promise<void> {
     const { clawWdk } = await loadWdkModule();
     if (!clawWdk.isReady()) return;
     const snap = await clawWdk.buildPortfolioSnapshot();
-    usePortfolioStore.getState().hydrateDemoPortfolio(snap);
+    usePortfolioStore.getState().hydratePortfolio(snap);
     usePortfolioStore.getState().setPortfolioSyncError(null);
     getQueryClient()?.invalidateQueries({ queryKey: queryKeys.portfolio.all });
     logChainExecution({
@@ -176,8 +205,9 @@ export async function createWallet(): Promise<{ address: string; chain: string }
   } catch {
     /* fallback when WDK is unavailable or not ready */
   }
+  const hex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
   return {
-    address: "0x" + "demo".padStart(40, "0"),
+    address: `0x${hex}`,
     chain: "ethereum",
   };
 }
@@ -193,7 +223,15 @@ export async function getBalances(queries: BalanceQuery[]): Promise<Record<strin
     const out: Record<string, number> = {};
     for (const q of queries) {
       try {
-        const row = await clawWdk.fetchBalances(q.chain as WdkChainId);
+        if (!isWdkChainId(q.chain)) {
+          out[`${q.chain}:${q.address}`] = 0;
+          continue;
+        }
+        const row = await clawWdk.fetchBalances(q.chain);
+        if (!queryAddressMatchesSigner(q.chain, q.address, row.address)) {
+          out[`${q.chain}:${q.address}`] = 0;
+          continue;
+        }
         const sum = (row.balances.USDT ?? 0) + (row.balances.XAUT ?? 0);
         out[`${q.chain}:${q.address}`] = sum;
       } catch {
@@ -233,10 +271,10 @@ export type SimulateTetherResult =
  * Non-EVM chains return OK with a note (RPC path not wired here).
  */
 export async function simulateTetherTransfer(params: SendTransactionParams): Promise<SimulateTetherResult> {
-  if (!(SUPPORTED_WDK_CHAINS as readonly string[]).includes(params.chain)) {
+  if (!isWdkChainId(params.chain)) {
     return { ok: false, error: `Unsupported chain: ${params.chain}` };
   }
-  const chain = params.chain as WdkChainId;
+  const chain = params.chain;
   if (!params.to?.trim()) return { ok: false, error: "Recipient address is required." };
   const amt = Number.parseFloat(params.amount);
   if (!Number.isFinite(amt) || amt <= 0) return { ok: false, error: "Invalid amount." };
@@ -290,7 +328,7 @@ export async function sendTransaction(
       code: "VALIDATION",
     };
   }
-  if (!(SUPPORTED_WDK_CHAINS as readonly string[]).includes(params.chain)) {
+  if (!isWdkChainId(params.chain)) {
     logChainExecution({
       operation: "wallet.send_transaction",
       phase: "end",
@@ -301,7 +339,7 @@ export async function sendTransaction(
     });
     return { ok: false, error: `Unsupported chain: ${params.chain}`, code: "VALIDATION" };
   }
-  const chain = params.chain as WdkChainId;
+  const chain = params.chain;
   if (!params.to?.trim()) {
     logChainExecution({
       operation: "wallet.send_transaction",
@@ -400,21 +438,22 @@ export async function sendTransaction(
   }
 }
 
-/** @deprecated Use connectDemoWallet — name kept for docs / search */
-export const connectRealWallet = connectDemoWallet;
+/** @deprecated Use connectWallet */
+export const connectDemoWallet = connectWallet;
+/** @deprecated Use connectWallet */
+export const connectRealWallet = connectWallet;
 
 /** After reload: reconnect WDK + refresh portfolio when a real session was active. */
 export async function restoreSessionIfNeeded(): Promise<void> {
   if (import.meta.env.VITE_USE_WDK === "false") return;
   try {
-    const connected =
-      typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+    const connected = isWalletSessionActive();
     const seed =
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WDK_SEED_SESSION_KEY) : null;
     const mode =
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
     if (!connected || mode !== "wdk" || !seed) return;
-    const r = await connectDemoWallet(seed);
+    const r = await connectWallet(seed);
     if (!r.success) {
       const raw = r.error?.trim() ?? "";
       const classified = raw ? classifyWalletError(raw) : null;

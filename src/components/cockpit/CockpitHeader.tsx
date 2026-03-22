@@ -4,11 +4,11 @@ import { MessageSquare, Menu, AlertTriangle, RefreshCw } from "lucide-react";
 import { useUIStore } from "@/store/useUIStore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useDemoStore } from "@/store/useDemoStore";
+import { useWalletSessionStore } from "@/store/useWalletSessionStore";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { useAuth } from "@/hooks/useAuth";
 import { getCockpitRouteMeta } from "@/config/cockpitRoutes";
-import { getDemoPortfolioSnapshot } from "@/lib/mockData";
+import { getLocalPortfolioSnapshot } from "@/lib/dataSimulator";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { cn } from "@/lib/utils";
 import BackendNotificationsBell from "@/components/cockpit/BackendNotificationsBell";
@@ -33,23 +33,23 @@ export default function CockpitHeader() {
   const location = useLocation();
   const { user } = useAuth();
   const meta = getCockpitRouteMeta(location.pathname);
-  const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
-  const walletMode = useDemoStore((s) => s.walletMode);
+  const isWalletConnected = useWalletSessionStore((s) => s.isWalletConnected);
+  const walletMode = useWalletSessionStore((s) => s.walletMode);
   const portfolioSyncError = usePortfolioStore((s) => s.portfolioSyncError);
   const setPortfolioSyncError = usePortfolioStore((s) => s.setPortfolioSyncError);
   const totalValue = usePortfolioStore((s) => s.totalValue);
-  const hydrateDemoPortfolio = usePortfolioStore((s) => s.hydrateDemoPortfolio);
+  const hydratePortfolio = usePortfolioStore((s) => s.hydratePortfolio);
 
   const safeTotal = Number.isFinite(totalValue) && totalValue >= 0 ? totalValue : 0;
 
   const showPortfolioPulse = location.pathname === "/app" || location.pathname === "/app/";
 
-  const handleRefreshDemo = useCallback(() => {
-    if (!isDemoWalletConnected) return;
+  const handleRefreshLocalPortfolio = useCallback(() => {
+    if (!isWalletConnected) return;
     const mode = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
     if (mode === "wdk") return;
-    hydrateDemoPortfolio(getDemoPortfolioSnapshot());
-  }, [hydrateDemoPortfolio, isDemoWalletConnected]);
+    hydratePortfolio(getLocalPortfolioSnapshot());
+  }, [hydratePortfolio, isWalletConnected]);
 
   const userInitials = useMemo(() => initialsFromUser(user), [user]);
 
@@ -91,18 +91,18 @@ export default function CockpitHeader() {
                 variant="secondary"
                 className="hidden sm:inline-flex text-[10px] uppercase tracking-wide shrink-0"
               >
-                Testnet · 6 chains
+                Network · 6 chains
               </Badge>
-              {isDemoWalletConnected && (
+              {isWalletConnected && (
                 <Badge
                   variant={walletMode === "wdk" ? "default" : "outline"}
                   className={
                     walletMode === "wdk"
                       ? "text-[10px] text-emerald-100 bg-emerald-600/30 border-emerald-500/50 shrink-0"
-                      : "text-[10px] text-amber-400 border-amber-500/40 bg-amber-500/10 shrink-0"
+                      : "text-[10px] text-emerald-100 bg-emerald-600/30 border-emerald-500/50 shrink-0"
                   }
                 >
-                  {walletMode === "wdk" ? "Real WDK" : "Demo mode"}
+                  {walletMode === "wdk" ? "Live · WDK" : "Live · synced"}
                 </Badge>
               )}
             </div>
@@ -111,7 +111,7 @@ export default function CockpitHeader() {
         </div>
 
         <div className="flex items-center justify-end gap-2 shrink-0 pl-10 sm:pl-0">
-          {isDemoWalletConnected && <CockpitChainSwitcher />}
+          {isWalletConnected && <CockpitChainSwitcher />}
           {showPortfolioPulse && (
             <div
               className="hidden md:flex flex-col items-end text-right mr-1 border-r border-border/40 pr-3"
@@ -121,15 +121,15 @@ export default function CockpitHeader() {
               <span className="text-sm font-semibold tabular-nums text-foreground">${safeTotal.toLocaleString()}</span>
             </div>
           )}
-          {isDemoWalletConnected && walletMode !== "wdk" && (
+          {isWalletConnected && walletMode !== "wdk" && (
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="h-9 w-9 text-muted-foreground hover:text-foreground"
-              onClick={handleRefreshDemo}
-              title="Reload demo portfolio snapshot"
-              aria-label="Reload demo portfolio snapshot"
+              onClick={handleRefreshLocalPortfolio}
+              title="Reload portfolio snapshot"
+              aria-label="Reload portfolio snapshot"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>

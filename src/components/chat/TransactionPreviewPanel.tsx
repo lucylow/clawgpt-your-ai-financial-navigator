@@ -88,7 +88,7 @@ export function TransactionPreviewPanel({ card, onConfirm, confirmLabel }: Trans
       {hasSafety && card.safety ? (
         <Collapsible className="mt-3 rounded-lg border border-border/35 bg-secondary/20">
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium text-foreground/90 hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&[data-state=open]>svg]:rotate-180">
-            Safety & simulation details
+            Safety & preview details
             <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" aria-hidden />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 border-t border-border/30 px-3 pb-3 pt-2 text-[10px] text-muted-foreground">

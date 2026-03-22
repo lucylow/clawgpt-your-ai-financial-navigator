@@ -1,6 +1,6 @@
 import { TransactionTicker } from "@/components/ticker/TransactionTicker";
 
-/** Marquee of recent / demo transactions — operational “pulse” for the cockpit. */
+/** Marquee of recent transactions — operational pulse for the cockpit. */
 export default function Ticker() {
   return (
     <div

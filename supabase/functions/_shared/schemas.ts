@@ -12,9 +12,11 @@ const sessionMemorySchema = z
     activeWalletLabel: z.string().max(128).optional(),
     automationPaused: z.boolean().optional(),
     dailyLimitUsd: z.number().positive().optional(),
-    demoMode: z.boolean().optional(),
+    localPortfolio: z.boolean().optional(),
     maxSingleTxUsd: z.number().positive().optional(),
     approvedChainKeys: z.array(z.string().min(2).max(32)).max(16).optional(),
+    conversationSummary: z.string().max(4000).optional(),
+    clawNavigatorAugmentation: z.string().max(12000).optional(),
   })
   .strict();
 

@@ -76,11 +76,16 @@ export type AgentSessionMemoryV1 = {
   activeWalletLabel?: string;
   automationPaused?: boolean;
   dailyLimitUsd?: number;
-  demoMode?: boolean;
+  /** True when UI is using local portfolio snapshot (not live WDK balances). */
+  localPortfolio?: boolean;
   /** User-owned cap echoed to edge policy prompts (no secrets). */
   maxSingleTxUsd?: number;
   /** Chains the user allows for this session (subset). */
   approvedChainKeys?: string[];
+  /** Rolling summary for multi-turn coherence (client-built). */
+  conversationSummary?: string;
+  /** Layered ClawGPT navigator prompt — injected as an extra system block on the edge. */
+  clawNavigatorAugmentation?: string;
 };
 
 /**
@@ -163,6 +168,11 @@ export async function streamAgentMessage({
       }
       const failed = !resp.ok || data.error === true;
       if (failed) {
+        const structured = parseAgentBackendError(data);
+        if (structured) {
+          onError(formatAgentErrorMessage(structured));
+          return;
+        }
         const msg =
           (typeof data.text === "string" && data.text) ||
           (typeof data.message === "string" && data.message) ||
@@ -214,11 +224,14 @@ export async function streamAgentMessage({
         if (t) {
           try {
             const j = JSON.parse(t) as Record<string, unknown>;
+            const structured = parseAgentBackendError(j);
             extra =
-              (typeof j.text === "string" && j.text) ||
-              (typeof j.message === "string" && j.message) ||
-              (typeof j.error === "string" && j.error) ||
-              "";
+              structured != null
+                ? formatAgentErrorMessage(structured)
+                : (typeof j.text === "string" && j.text) ||
+                  (typeof j.message === "string" && j.message) ||
+                  (typeof j.error === "string" && j.error) ||
+                  "";
           } catch {
             extra = t.length > 280 ? `${t.slice(0, 280)}…` : t;
           }

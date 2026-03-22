@@ -181,7 +181,7 @@ export function buildSafetyFromAgentMetadata(meta: {
   };
 }
 
-/** Demo / mock chat path — same shape as server `safetyForTransfer`. */
+/** Client chat path — same shape as server `safetyForTransfer`. */
 export function buildDemoTransferSafety(
   chain: string,
   to: string | undefined,
@@ -198,7 +198,7 @@ export function buildDemoTransferSafety(
       surface: "transaction_card",
     },
     actionPreview: {
-      title: "Token transfer (demo)",
+      title: "Token transfer (preview)",
       steps: ["Review recipient", "Run client risk engine", "Confirm to simulate or send via WDK"],
       contracts: [],
       amounts: [{ label: "Send", value: `${amount} ${asset}` }],

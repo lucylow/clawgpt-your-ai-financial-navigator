@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabaseEnv";
 import { mapTransactionRow } from "@/lib/mapSupabaseRealtime";
 import { useAuth } from "@/hooks/useAuth";
+import { captureError } from "@/lib/observability";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import {
   useBackendStreamStore,
@@ -73,71 +74,87 @@ export function useSupabaseEventStream() {
     const setStreamConnected = useBackendStreamStore.getState().setStreamConnected;
 
     const onTx = (payload: RealtimePostgresChangesPayload<Tables<"transactions">>) => {
-      const row = payload.new ?? payload.old;
-      if (!isTxRow(row)) return;
-      const tx = mapTransactionRow(row);
-      usePortfolioStore.getState().upsertTransactionFromBackend(tx);
-      if (payload.eventType === "INSERT") {
-        toast.info("Transaction synced", {
-          description: `${tx.type} · ${tx.hash.length > 14 ? `${tx.hash.slice(0, 10)}…` : tx.hash}`,
-          duration: 4200,
-          id: `tx-${tx.hash}`,
-        });
+      try {
+        const row = payload.new ?? payload.old;
+        if (!isTxRow(row)) return;
+        const tx = mapTransactionRow(row);
+        usePortfolioStore.getState().upsertTransactionFromBackend(tx);
+        if (payload.eventType === "INSERT") {
+          toast.info("Transaction synced", {
+            description: `${tx.type} · ${tx.hash.length > 14 ? `${tx.hash.slice(0, 10)}…` : tx.hash}`,
+            duration: 4200,
+            id: `tx-${tx.hash}`,
+          });
+        }
+      } catch (e) {
+        captureError(e, { context: { source: "supabase_realtime", table: "transactions" } });
       }
     };
 
     const onSnapshot = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
-      const row = payload.new;
-      if (!isSnapshotRow(row)) return;
-      usePortfolioStore.getState().mergeBackendSnapshot(row.payload);
+      try {
+        const row = payload.new;
+        if (!isSnapshotRow(row)) return;
+        usePortfolioStore.getState().mergeBackendSnapshot(row.payload);
+      } catch (e) {
+        captureError(e, { context: { source: "supabase_realtime", table: "portfolio_snapshots" } });
+      }
     };
 
     const onNotification = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
-      const row = payload.new as Record<string, unknown> | undefined;
-      if (!isNotificationRow(row)) return;
-      if (payload.eventType === "UPDATE") {
-        if (row.read_at) {
-          useBackendStreamStore.getState().patchNotificationRead(row.id as string, row.read_at as string);
+      try {
+        const row = payload.new as Record<string, unknown> | undefined;
+        if (!isNotificationRow(row)) return;
+        if (payload.eventType === "UPDATE") {
+          if (row.read_at) {
+            useBackendStreamStore.getState().patchNotificationRead(row.id as string, row.read_at as string);
+          }
+          return;
         }
-        return;
-      }
-      const n: StreamedNotification = {
-        id: row.id as string,
-        kind: row.kind as string,
-        title: row.title as string,
-        body: row.body as string | undefined,
-        metadata: metadataAsRecord(row.metadata),
-        read_at: row.read_at as string | null,
-        created_at: row.created_at as string,
-      };
-      useBackendStreamStore.getState().pushNotification(n);
-      if (n.read_at == null) {
-        toast(n.title, {
-          description: n.body ?? undefined,
-          duration: 6500,
-          id: `notification-${n.id}`,
-        });
+        const n: StreamedNotification = {
+          id: row.id as string,
+          kind: row.kind as string,
+          title: row.title as string,
+          body: row.body as string | undefined,
+          metadata: metadataAsRecord(row.metadata),
+          read_at: row.read_at as string | null,
+          created_at: row.created_at as string,
+        };
+        useBackendStreamStore.getState().pushNotification(n);
+        if (n.read_at == null) {
+          toast(n.title, {
+            description: n.body ?? undefined,
+            duration: 6500,
+            id: `notification-${n.id}`,
+          });
+        }
+      } catch (e) {
+        captureError(e, { context: { source: "supabase_realtime", table: "notifications" } });
       }
     };
 
     const onActivity = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
-      const row = payload.new as Record<string, unknown> | undefined;
-      if (!isActivityRow(row)) return;
-      const a: StreamedActivityItem = {
-        id: row.id as string,
-        category: row.category as string,
-        summary: row.summary as string,
-        detail: row.detail as string | undefined,
-        metadata: metadataAsRecord(row.metadata),
-        created_at: row.created_at as string,
-      };
-      useBackendStreamStore.getState().pushActivity(a);
-      const desc = [a.category, a.detail].filter(Boolean).join(" · ") || undefined;
-      toast.message(a.summary, {
-        description: desc,
-        duration: 5000,
-        id: `activity-${a.id}`,
-      });
+      try {
+        const row = payload.new as Record<string, unknown> | undefined;
+        if (!isActivityRow(row)) return;
+        const a: StreamedActivityItem = {
+          id: row.id as string,
+          category: row.category as string,
+          summary: row.summary as string,
+          detail: row.detail as string | undefined,
+          metadata: metadataAsRecord(row.metadata),
+          created_at: row.created_at as string,
+        };
+        useBackendStreamStore.getState().pushActivity(a);
+        const desc = [a.category, a.detail].filter(Boolean).join(" · ") || undefined;
+        toast.message(a.summary, {
+          description: desc,
+          duration: 5000,
+          id: `activity-${a.id}`,
+        });
+      } catch (e) {
+        captureError(e, { context: { source: "supabase_realtime", table: "activity_feed" } });
+      }
     };
 
     let cancelled = false;
@@ -174,7 +191,9 @@ export function useSupabaseEventStream() {
     return () => {
       cancelled = true;
       setStreamConnected(false);
-      void supabase.removeChannel(channel);
+      void supabase.removeChannel(channel).catch((e) =>
+        captureError(e, { context: { source: "supabase_realtime", action: "removeChannel" } }),
+      );
     };
   }, [userId]);
 }

@@ -1,9 +1,10 @@
 import { useCallback } from "react";
 import { getWalletMode, refreshLivePortfolio } from "@/lib/walletClient";
+import { captureError } from "@/lib/observability";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 
 /**
- * Single hook for cockpit data: portfolio store + refresh placeholder.
+ * Single hook for cockpit data: portfolio store + refresh.
  */
 export function usePortfolio() {
   const store = usePortfolioStore();
@@ -13,6 +14,7 @@ export function usePortfolio() {
       try {
         await refreshLivePortfolio();
       } catch (e) {
+        captureError(e, { context: { source: "usePortfolio.refreshBalances" } });
         console.error("[usePortfolio] refreshLivePortfolio:", e);
       }
     }

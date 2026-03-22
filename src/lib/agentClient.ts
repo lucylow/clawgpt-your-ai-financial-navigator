@@ -1,4 +1,4 @@
-import { streamAgentMessage, type AgentMetadata } from "@/lib/agent";
+import { streamAgentMessage, type AgentMetadata, type AgentSessionMemoryV1 } from "@/lib/agent";
 import { trackAgentChatTurn } from "@/lib/observability";
 import { isSupabaseConfigured } from "@/lib/supabaseEnv";
 import { buildDemoTransferSafety, buildSafetyFromAgentMetadata } from "@/lib/agentSafety";
@@ -14,6 +14,19 @@ import type { AgentProposedPlan } from "@/lib/agentWorkflow";
 import type { AgentPortfolioUpdate, ChatCardPayload } from "@/types";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { PortfolioAnalyzerSkill } from "@/lib/agent-skills";
+import {
+  CLAW_MANDATORY_DISCLAIMER,
+  ClawUserIntent,
+  clawResponseToAssistantMarkdown,
+  parseClawChatResponse,
+} from "@/ai/chat-schema";
+import { detectClawIntent } from "@/ai/intent-detector";
+import { buildClawPrompt, buildWalletSnapshotFromState, defaultCoreSystemConfig } from "@/ai/prompt-builder";
+import { critiqueAssistantReply } from "@/ai/response-critic";
+import { sessionMemoryFromUserPolicy } from "@/lib/sovereignty/userPolicy";
+import { useChatStore } from "@/store/useChatStore";
+import { useWalletSessionStore } from "@/store/useWalletSessionStore";
+import { useUserPolicyStore } from "@/store/useUserPolicyStore";
 
 export interface AgentClientResult {
   text: string;
@@ -78,7 +91,7 @@ function delay(ms: number) {
 }
 
 /**
- * Rich mock responses for demos — exercises portfolio Q&A, cards, and store updates.
+ * Offline agent path — exercises portfolio Q&A, cards, and store updates when Supabase is unavailable.
  */
 async function mockSendMessage(content: string): Promise<AgentClientResult> {
   const q = content.toLowerCase();
@@ -90,10 +103,10 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
   ) {
     return {
       text:
-        "**Route comparison (demo model)**\n\n" +
+        "**Route comparison (preview)**\n\n" +
         "| Route | Est. total | ETA | Notes |\n" +
         "|-------|------------|-----|-------|\n" +
-        "| **Direct:** Ethereum → Arbitrum | ~$8–10 (gas + relay demo) | ~12–24h full exit | Canonical rollup path |\n" +
+        "| **Direct:** Ethereum → Arbitrum | ~$8–10 (gas + relay) | ~12–24h full exit | Canonical rollup path |\n" +
         "| **Via Polygon hub** (illustrative) | varies; extra hops | slower | Check live bridge quotes |\n\n" +
         "Use **compare_chain_routes** on the live agent for amounts and guardrails. Prefer audited bridges for size.",
       intent: "compare_routes",
@@ -118,7 +131,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
   if (q.includes("rebalanc") || (q.includes("target") && q.includes("usdt"))) {
     return {
       text:
-        "**Rebalancing (demo policy)**\n\n" +
+        "**Rebalancing (policy preview)**\n\n" +
         "• Set a **target USDt %** of NAV (liquidity sleeve) — e.g. **65%** USDt / **35%** XAUt hedge.\n" +
         "• If drift is small (<~1–2%), **no trade** may be best.\n" +
         "• To raise USDt: swap **XAUt → USDt** on an AMM chain with good depth; watch slippage.\n" +
@@ -145,8 +158,8 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
   ) {
     return {
       text:
-        "**Portfolio movements (demo snapshot)**\n\n" +
-        "Net flows vs a **7-day prior** model: USDt and XAUt shifted slightly toward **Arbitrum** and **Ethereum** in the demo store. Open **Transactions** for settlement detail; live history uses your wallet connection.\n\n" +
+        "**Portfolio movements (snapshot)**\n\n" +
+        "Net flows vs a **7-day prior** model: USDt and XAUt shifted slightly toward **Arbitrum** and **Ethereum** in the cockpit store. Open **Transactions** for settlement detail; live history uses your wallet connection.\n\n" +
         "Ask the connected agent for a **full table** via **summarize_portfolio_movements**.",
       intent: "movements_summary",
     };
@@ -191,7 +204,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
         `• **Concentration / sleeve risk:** **${a.riskScoreLabel}**\n\n` +
         (a.opportunities.length
           ? `**Idle / yield opportunities:**\n${oppLines}\n\n`
-          : "**No idle USDt blocks flagged** over the demo threshold.\n\n") +
+          : "**No idle USDt blocks flagged** over the policy threshold.\n\n") +
         (a.recommendations.length
           ? `**Recommendations:**\n${a.recommendations.map((r) => `• ${r}`).join("\n")}`
           : ""),
@@ -206,7 +219,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
       proposedPlan: {
         title: "Recurring buy (schedule only)",
         steps: [
-          "Choose asset and chain (USDt on Arbitrum in demos)",
+          "Choose asset and chain (USDt on Arbitrum)",
           "Set amount per run and frequency",
           "Confirm schedule — execution requires WDK + confirmed automation",
         ],
@@ -238,7 +251,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
       toChain,
       amountUsd,
       asset,
-      /** Demo: user intent implies durable fee savings on L2; still gated by policy */
+      /** User intent implies durable fee savings on L2; still gated by policy */
       expectedBenefitUsd: 120,
     });
 
@@ -300,7 +313,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
         title: "Rebalance idle USDt (edge vs costs)",
         steps: [
           "Confirm source/target chains and amount",
-          "Review bridge path (demo simulates allocation only)",
+          "Review bridge path (allocation preview only)",
           "Reconcile balances after execution",
         ],
         requiresOnChainConfirmation: true,
@@ -341,7 +354,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
         "I've prepared a **testnet** transfer. **USD₮** is modeled as **spendable liquidity** — confirm only after reviewing estimated gas and remaining on-chain reserve.",
       intent: "transfer_ready",
       proposedPlan: {
-        title: "Send USDt (EVM testnet)",
+        title: "Send USDt (EVM)",
         steps: [
           "Validate amount and chain",
           "Preview recipient (from card or VITE_DEMO_TRANSFER_RECIPIENT)",
@@ -380,7 +393,7 @@ async function mockSendMessage(content: string): Promise<AgentClientResult> {
 
   return {
     text:
-      "I'm running in **demo mode** with mocked reasoning. Try:\n" +
+      "I'm running in **offline preview** mode. Try:\n" +
       "- “Summarize portfolio movements” / “What changed?”\n" +
       "- “Suggest rebalancing to 65% USDt”\n" +
       "- “Draft a transaction plan for yield”\n" +
@@ -399,21 +412,96 @@ function newIdempotencyKey(): string {
   }
 }
 
-async function streamToResult(
-  content: string,
-  history: HistoryMessage[]
-): Promise<AgentClientResult> {
+function buildNavigatorSessionMemory(
+  userMessage: string,
+  detection: ReturnType<typeof detectClawIntent>,
+): AgentSessionMemoryV1 {
+  useChatStore.getState().setLastDetection(detection.intent, detection.entities);
+
+  const portfolio = usePortfolioStore.getState();
+  const policy = useUserPolicyStore.getState().policy;
+  const localPortfolio = useWalletSessionStore.getState().walletMode === "local";
+
+  const snapshot = buildWalletSnapshotFromState({
+    totalValue: portfolio.totalValue,
+    allocation: portfolio.allocation,
+    allocationByAsset: portfolio.allocationByAsset,
+    transactions: portfolio.transactions,
+    chains: portfolio.chains,
+    riskProfile: "balanced",
+    dailyLimitUsd: policy.maxDailyUsdOut,
+    maxSingleTxUsd: policy.maxSingleTxUsd,
+  });
+
+  const conversationSummary = useChatStore.getState().conversationSummary;
+  const augmentation = buildClawPrompt({
+    system: defaultCoreSystemConfig(),
+    context: snapshot,
+    userMessage,
+    parsedIntent: detection,
+    conversationSummary: conversationSummary || undefined,
+  });
+
+  return {
+    ...sessionMemoryFromUserPolicy(policy, { localPortfolio }),
+    conversationSummary: conversationSummary || undefined,
+    clawNavigatorAugmentation: augmentation,
+  };
+}
+
+function finalizeAssistantText(
+  rawModelText: string,
+  detection: ReturnType<typeof detectClawIntent>,
+): { displayText: string; intent?: string; proposedPlan?: AgentProposedPlan } {
+  const parsed = parseClawChatResponse(rawModelText);
+  if (parsed.ok) {
+    let displayText = clawResponseToAssistantMarkdown(parsed.data);
+    const critic = critiqueAssistantReply(displayText, {
+      intentHint: detection,
+      expectBalanceGrounding: parsed.data.primary_intent === ClawUserIntent.SEND_FUNDS,
+    });
+    if (critic.appendNextSteps) displayText = `${displayText}\n\n${critic.appendNextSteps}`;
+    const proposedPlan: AgentProposedPlan | undefined =
+      parsed.data.mode === "action_proposal" && parsed.data.summary && parsed.data.steps?.length
+        ? {
+            title: parsed.data.summary,
+            steps: parsed.data.steps,
+            requiresOnChainConfirmation: parsed.data.requires_confirmation !== false,
+          }
+        : undefined;
+    return { displayText, intent: parsed.data.primary_intent, proposedPlan };
+  }
+
+  console.warn("[ClawGPT] Structured JSON parse failed; showing raw assistant text.", parsed.error.flatten());
+  let displayText = rawModelText.trim();
+  if (!displayText) {
+    displayText = `I couldn't read the assistant reply in the expected format. Please try again.\n\n---\n${CLAW_MANDATORY_DISCLAIMER}`;
+  } else if (!displayText.includes("financial advisor")) {
+    displayText = `${displayText}\n\n---\n${CLAW_MANDATORY_DISCLAIMER}`;
+  }
+  const critic = critiqueAssistantReply(displayText, {
+    intentHint: detection,
+    expectBalanceGrounding: detection.intent === ClawUserIntent.SEND_FUNDS,
+  });
+  if (critic.appendNextSteps) displayText = `${displayText}\n\n${critic.appendNextSteps}`;
+  return { displayText, intent: undefined };
+}
+
+async function streamToResult(content: string, history: HistoryMessage[]): Promise<AgentClientResult> {
   let text = "";
   let metadata: AgentMetadata | undefined;
   const idempotencyKey = newIdempotencyKey();
   const correlationId = newIdempotencyKey();
   const t0 = Date.now();
+  const detection = detectClawIntent(content);
+  const sessionMemory = buildNavigatorSessionMemory(content, detection);
 
   try {
     await new Promise<void>((resolve, reject) => {
       streamAgentMessage({
         content,
         history,
+        sessionMemory,
         idempotencyKey,
         correlationId,
         onDelta: (t) => {
@@ -445,12 +533,17 @@ async function streamToResult(
     ? normalizePortfolioUpdate(metadata?.portfolioUpdate)
     : undefined;
 
+  const finalized = finalizeAssistantText(text, detection);
+  useChatStore.getState().appendAssistantTurn(content, finalized.displayText);
+
+  const toolCard = transactionCardFromMetadata(metadata);
   return {
-    text,
+    text: finalized.displayText,
     portfolioUpdate,
     portfolioPreview: metadata?.portfolioPreview,
-    intent: undefined,
-    card: transactionCardFromMetadata(metadata),
+    intent: finalized.intent,
+    proposedPlan: finalized.proposedPlan,
+    card: toolCard,
   };
 }
 
@@ -490,7 +583,7 @@ export async function sendMessage(
     try {
       return await mockSendMessage(trimmed);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Demo agent failed.";
+      const msg = e instanceof Error ? e.message : "Assistant preview failed.";
       return { text: `⚠️ ${msg}`, intent: "error" };
     }
   }

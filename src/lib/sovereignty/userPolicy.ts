@@ -33,13 +33,13 @@ export function defaultUserPolicy(): UserPolicyV1 {
 
 export function sessionMemoryFromUserPolicy(
   policy: UserPolicyV1,
-  opts?: { demoMode?: boolean; activeChainKey?: WdkChainId },
+  opts?: { localPortfolio?: boolean; activeChainKey?: WdkChainId },
 ): AgentSessionMemoryV1 {
   return {
     v: 1,
     automationPaused: policy.blockAgentExecution,
     dailyLimitUsd: policy.maxDailyUsdOut,
-    demoMode: opts?.demoMode,
+    localPortfolio: opts?.localPortfolio,
     activeChainKey: opts?.activeChainKey,
     maxSingleTxUsd: policy.maxSingleTxUsd,
     approvedChainKeys: policy.approvedChains,

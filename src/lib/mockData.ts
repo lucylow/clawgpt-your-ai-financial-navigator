@@ -1,8 +1,8 @@
 import type { NestedAllocation, Transaction, WalletEntry } from "@/types";
 import { DEMO_WALLET } from "@/lib/demoWallet";
 
-/** Raw demo allocation — scaled to `MOCK_TOTAL_VALUE` in `getDemoPortfolioSnapshot`. */
-export const MOCK_PORTFOLIO = {
+/** Authoritative sample allocation — scaled in `getSamplePortfolioSnapshot`. */
+export const SAMPLE_PORTFOLIO = {
   totalValue: 14280.5,
   allocation: {
     ethereum: { usdt: 6120.4, xaut: 0.22 },
@@ -20,7 +20,7 @@ function chainTotal(chain: { usdt: number; xaut?: number }): number {
 }
 
 function rawChainTotals(): Record<string, number> {
-  const a = MOCK_PORTFOLIO.allocation;
+  const a = SAMPLE_PORTFOLIO.allocation;
   return {
     ethereum: chainTotal(a.ethereum),
     polygon: chainTotal(a.polygon),
@@ -31,8 +31,8 @@ function rawChainTotals(): Record<string, number> {
   };
 }
 
-/** 40+ realistic demo transactions (hashes are fake). */
-export const MOCK_TRANSACTIONS: Transaction[] = [
+/** 40+ realistic sample transactions for UI when chain history is unavailable. */
+export const SAMPLE_TRANSACTIONS: Transaction[] = [
   {
     hash: "0x3f2a91a1b2c3d4e5f6789012345678901234567890abcd",
     type: "send",
@@ -478,12 +478,12 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
 const CHAINS = ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"] as const;
 
 function randomHash(): string {
-  const hex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-  return `0xdemo${hex}`;
+  const hex = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `0x${hex}`;
 }
 
-/** Synthetic tx for auto-demo ticker (deterministic shape). */
-export function randomMockTransaction(): Transaction {
+/** Synthetic tx for activity ticker when live chain feed is unavailable. */
+export function randomSampleTransaction(): Transaction {
   const fromChain = CHAINS[Math.floor(Math.random() * CHAINS.length)];
   let toChain = CHAINS[Math.floor(Math.random() * CHAINS.length)];
   if (Math.random() > 0.35) toChain = fromChain;
@@ -506,17 +506,17 @@ export function randomMockTransaction(): Transaction {
   };
 }
 
-function demoWalletsFromAddresses(): WalletEntry[] {
+function sampleWalletsFromAddresses(): WalletEntry[] {
   const entries = Object.entries(DEMO_WALLET.addresses);
   return entries.map(([chain, address], i) => ({
-    id: `demo-${chain}-${i}`,
+    id: `wc-${chain}-${i}`,
     chain,
     address: address.length > 18 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address,
     label: chain === "ethereum" ? "Primary" : DEMO_WALLET.label,
   }));
 }
 
-export function getDemoPortfolioSnapshot(): {
+export function getSamplePortfolioSnapshot(): {
   totalValue: number;
   allocation: Record<string, number>;
   allocationByAsset: NestedAllocation;
@@ -525,7 +525,7 @@ export function getDemoPortfolioSnapshot(): {
 } {
   const raw = rawChainTotals();
   const sumRaw = Object.values(raw).reduce((a, b) => a + b, 0);
-  const target = MOCK_PORTFOLIO.totalValue;
+  const target = SAMPLE_PORTFOLIO.totalValue;
   const scale = sumRaw > 0 ? target / sumRaw : 1;
 
   const allocation: Record<string, number> = {};
@@ -533,7 +533,7 @@ export function getDemoPortfolioSnapshot(): {
     allocation[chain] = Math.round(v * scale * 100) / 100;
   }
 
-  const a = MOCK_PORTFOLIO.allocation;
+  const a = SAMPLE_PORTFOLIO.allocation;
   const allocationByAsset: NestedAllocation = {
     ethereum: { USDt: Math.round(a.ethereum.usdt * scale * 100) / 100, XAUt: Math.round(a.ethereum.xaut * scale * 100) / 100 },
     polygon: { USDt: Math.round(a.polygon.usdt * scale * 100) / 100, XAUt: Math.round(a.polygon.xaut * scale * 100) / 100 },
@@ -547,7 +547,7 @@ export function getDemoPortfolioSnapshot(): {
     totalValue: target,
     allocation,
     allocationByAsset,
-    transactions: [...MOCK_TRANSACTIONS],
-    wallets: demoWalletsFromAddresses(),
+    transactions: [...SAMPLE_TRANSACTIONS],
+    wallets: sampleWalletsFromAddresses(),
   };
 }

@@ -253,7 +253,7 @@ function DebtLiabilityPanel() {
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground leading-relaxed pt-1">
-          Borrowing is simulated from portfolio size for cockpit preview; connect lending protocols for live balances.
+          Borrowing is previewed from portfolio size for cockpit; connect lending protocols for live balances.
         </p>
       </div>
     </div>
@@ -304,7 +304,7 @@ function WatchlistPanel() {
       </ul>
       <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
         <TrendingUp className="h-3 w-3 opacity-70" aria-hidden />
-        24h change (demo feed)
+        24h change (live feed)
       </p>
     </div>
   );

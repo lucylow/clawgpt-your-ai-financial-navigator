@@ -91,7 +91,7 @@ export default function PortfolioPage() {
             <p className="text-lg font-mono text-foreground">
               {Number.isFinite(economics.runway) ? `${economics.runway.toFixed(1)} mo` : "—"}
             </p>
-            <p className="text-[11px] text-muted-foreground">~$45/mo activity assumption (demo)</p>
+            <p className="text-[11px] text-muted-foreground">~$45/mo activity assumption (estimate)</p>
           </div>
         </div>
       </div>

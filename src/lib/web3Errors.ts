@@ -78,6 +78,6 @@ export function classifyWalletError(raw: string): ClassifiedWalletError {
   return {
     code: "EXECUTION",
     message: s.length > 160 ? `${s.slice(0, 157)}…` : s,
-    hint: "If this persists, reconnect the wallet or switch to demo mode from the header.",
+    hint: "If this persists, reconnect the wallet from the header.",
   };
 }

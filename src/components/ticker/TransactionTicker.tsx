@@ -23,7 +23,7 @@ function LiveRegion({ transactions }: { transactions: TickerTransaction[] }) {
 export function TransactionTicker() {
   const transactions = useTickerFeed();
   const totalValue = usePortfolioStore((s) => s.totalValue);
-  const addDemoTransaction = useTickerStore((s) => s.addDemoTransaction);
+  const addPulseTransaction = useTickerStore((s) => s.addPulseTransaction);
 
   /** Larger portfolios → slightly faster marquee (more “activity”). */
   const marqueeDurationSec = useMemo(() => {
@@ -35,14 +35,14 @@ export function TransactionTicker() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      addDemoTransaction();
+      addPulseTransaction();
     }, 10_000);
     return () => window.clearInterval(id);
-  }, [addDemoTransaction]);
+  }, [addPulseTransaction]);
 
   const empty = (
     <div className="flex h-20 items-center px-4 text-sm text-muted-foreground">
-      No transactions yet — ask Claw to simulate a send or bridge.
+      No transactions yet — ask Claw to preview a send or bridge.
     </div>
   );
 

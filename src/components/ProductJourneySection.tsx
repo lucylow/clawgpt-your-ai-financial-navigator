@@ -29,7 +29,7 @@ const phases = [
   {
     icon: LayoutDashboard,
     title: "Enter the cockpit",
-    body: "Open the dashboard: assistant on one side, live portfolio and globe on the other — same layout as after Launch demo.",
+    body: "Open the dashboard: assistant on one side, live portfolio and globe on the other — same layout as after Connect wallet.",
   },
   {
     icon: Wallet,
@@ -44,7 +44,7 @@ const phases = [
   {
     icon: ClipboardCheck,
     title: "Review the action",
-    body: "Cards and policy checks surface amounts, fees, and risk before anything touches your wallet (or demo state).",
+    body: "Cards and policy checks surface amounts, fees, and risk before anything touches your wallet.",
   },
   {
     icon: GitBranch,
@@ -77,7 +77,7 @@ export default function ProductJourneySection() {
             <span className="mx-2 text-muted-foreground/60" aria-hidden>
               ·
             </span>
-            <span>Read-only sample data; sign in or launch demo for full flows.</span>
+            <span>Read-only sample data; sign in or connect wallet for full flows.</span>
           </p>
         </div>
 

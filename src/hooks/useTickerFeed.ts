@@ -4,7 +4,7 @@ import { mergeTickerFeed, useTickerStore } from "@/store/useTickerStore";
 
 export function useTickerFeed() {
   const portfolioTxs = usePortfolioStore((s) => s.transactions);
-  const demoTxs = useTickerStore((s) => s.demoTransactions);
+  const pulseTxs = useTickerStore((s) => s.pulseTransactions);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -12,5 +12,5 @@ export function useTickerFeed() {
     return () => window.clearInterval(id);
   }, []);
 
-  return useMemo(() => mergeTickerFeed(portfolioTxs, demoTxs, now), [portfolioTxs, demoTxs, now]);
+  return useMemo(() => mergeTickerFeed(portfolioTxs, pulseTxs, now), [portfolioTxs, pulseTxs, now]);
 }

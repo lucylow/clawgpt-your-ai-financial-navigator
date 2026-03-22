@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { GitBranch, LayoutGrid, Mail, Menu, PlayCircle, Route } from "lucide-react";
-import DemoWalletButton from "@/components/DemoWalletButton";
+import WalletConnectButton from "@/components/WalletConnectButton";
 import { ClawLogo } from "@/components/ClawLogo";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const NAV_SECTIONS = [
   { id: "features", label: "Features", href: "#features", icon: LayoutGrid },
   { id: "journey", label: "Journey", href: "#journey", icon: Route },
-  { id: "demo", label: "Demo", href: "#demo", icon: PlayCircle },
+  { id: "cockpit", label: "Cockpit", href: "#cockpit", icon: PlayCircle },
   { id: "how-it-works", label: "How it works", href: "#how-it-works", icon: GitBranch },
   { id: "waitlist", label: "Waitlist", href: "#waitlist", icon: Mail },
 ] as const;
@@ -105,7 +105,7 @@ export default function Navbar() {
               >
                 Sign in
               </Link>
-              <DemoWalletButton variant="compact" className="min-h-[40px]" />
+              <WalletConnectButton variant="compact" className="min-h-[40px]" />
             </div>
 
             <button
@@ -180,7 +180,7 @@ export default function Navbar() {
             >
               Sign in
             </Link>
-            <DemoWalletButton variant="compact" className="min-h-[52px] w-full justify-center" />
+            <WalletConnectButton variant="compact" className="min-h-[52px] w-full justify-center" />
           </div>
         </SheetContent>
       </Sheet>

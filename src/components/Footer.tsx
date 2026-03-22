@@ -30,8 +30,8 @@ export default function Footer() {
           <a href="#journey" className="hover:text-foreground transition-colors">
             Journey
           </a>
-          <a href="#demo" className="hover:text-foreground transition-colors">
-            Demo
+          <a href="#cockpit" className="hover:text-foreground transition-colors">
+            Cockpit
           </a>
           <Link to="/auth" className="hover:text-foreground transition-colors">
             Sign in

@@ -7,20 +7,20 @@ import CockpitSidebar from "@/components/cockpit/CockpitSidebar";
 import CockpitHeader from "@/components/cockpit/CockpitHeader";
 import { WalletErrorBoundary } from "@/components/WalletErrorBoundary";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import { useDemoModeEffects } from "@/hooks/useDemoModeEffects";
-import { useDemoStore } from "@/store/useDemoStore";
-import { getDemoPortfolioSnapshot } from "@/lib/mockData";
+import { useWalletSessionEffects } from "@/hooks/useWalletSessionEffects";
+import { useWalletSessionStore } from "@/store/useWalletSessionStore";
+import { getLocalPortfolioSnapshot } from "@/lib/dataSimulator";
 import { WALLET_MODE_KEY } from "@/lib/demoWallet";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
 import { useSupabaseEventStream } from "@/hooks/useSupabaseEventStream";
 
 export default function CockpitLayout() {
   const { sidebarOpen } = useUIStore();
-  useDemoModeEffects();
+  useWalletSessionEffects();
   useSupabaseEventStream();
 
   useEffect(() => {
-    if (!useDemoStore.getState().isDemoWalletConnected) return;
+    if (!useWalletSessionStore.getState().isWalletConnected) return;
     const mode =
       typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_MODE_KEY) : null;
     if (mode === "wdk") {
@@ -32,7 +32,7 @@ export default function CockpitLayout() {
         });
       return;
     }
-    usePortfolioStore.getState().hydrateDemoPortfolio(getDemoPortfolioSnapshot());
+    usePortfolioStore.getState().hydratePortfolio(getLocalPortfolioSnapshot());
   }, []);
 
   return (

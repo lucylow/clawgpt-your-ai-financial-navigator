@@ -10,9 +10,9 @@ interface ImportMetaEnv {
   /** Optional public path when the app is not served at domain root (read in vite.config only). */
   readonly VITE_BASE_PATH?: string;
   readonly VITE_USE_MOCK_AGENT?: string;
-  /** When true, demo wallet bypass is disabled for /app — Supabase session required. */
+  /** When true, wallet-session bypass is disabled for /app — Supabase session required. */
   readonly VITE_REQUIRE_AUTH_FOR_APP?: string;
-  /** Default 0x recipient for mock agent “send to Sarah” when using real WDK on EVM testnets */
+  /** Default 0x recipient for offline “send to Sarah” when using real WDK on EVM networks */
   readonly VITE_DEMO_TRANSFER_RECIPIENT?: string;
   readonly VITE_USE_WDK?: string;
   readonly VITE_ETH_RPC_SEPOLIA?: string;

@@ -30,8 +30,8 @@ interface PortfolioState {
   portfolioSyncError: string | null;
   agent: AgentSliceState;
 
-  /** Full replace for frontend demo / mock hydration */
-  hydrateDemoPortfolio: (payload: {
+  /** Full replace when hydrating from WDK or local portfolio snapshot */
+  hydratePortfolio: (payload: {
     totalValue: number;
     allocation: Record<string, number>;
     allocationByAsset: NestedAllocation;
@@ -60,7 +60,7 @@ interface PortfolioState {
   clearError: () => void;
 }
 
-const demoWallets: WalletEntry[] = [
+const sampleWallets: WalletEntry[] = [
   {
     id: "w1",
     chain: "ethereum",
@@ -129,7 +129,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     },
   ],
   chains: ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"],
-  wallets: demoWallets,
+  wallets: sampleWallets,
   error: null,
   portfolioSyncError: null,
   agent: {
@@ -140,7 +140,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     sessionImpact: { ...DEFAULT_SESSION_IMPACT },
   },
 
-  hydrateDemoPortfolio: (payload) => {
+  hydratePortfolio: (payload) => {
     set({
       totalValue: payload.totalValue,
       allocation: payload.allocation,

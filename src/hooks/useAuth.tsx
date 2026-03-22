@@ -1,8 +1,7 @@
 import { useEffect, useState, createContext, useContext, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
+import { clearWalletSessionFlags } from "@/lib/demoWallet";
 import type { User, Session } from "@supabase/supabase-js";
-import { useDemoStore } from "@/store/useDemoStore";
 
 interface AuthContextType {
   user: User | null;
@@ -54,11 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error("[Auth] signOut failed:", e);
     }
-    try {
-      localStorage.removeItem(DEMO_SESSION_KEY);
-    } catch {
-      /* ignore */
-    }
+    clearWalletSessionFlags();
     setUser(null);
     setSession(null);
   };

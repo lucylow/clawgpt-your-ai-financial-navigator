@@ -2,7 +2,7 @@ const steps = [
   {
     num: "1",
     title: "Sign in & connect",
-    desc: "Authenticate, then connect a demo or WDK wallet. Your cockpit loads with balances and activity in view.",
+    desc: "Authenticate, then connect your wallet. Your cockpit loads with balances and activity in view.",
   },
   {
     num: "2",
@@ -12,7 +12,7 @@ const steps = [
   {
     num: "3",
     title: "Execute or branch",
-    desc: "Confirm to update portfolio and ticker (or submit via WDK on testnet). Start another workflow anytime.",
+    desc: "Confirm to update portfolio and ticker (or submit via WDK on your network). Start another workflow anytime.",
   },
 ];
 

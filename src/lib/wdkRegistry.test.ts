@@ -3,6 +3,7 @@ import {
   CHAIN_RUNTIME_CAPS,
   CHAIN_WALLET_REGISTRY,
   getTetherTransferSupport,
+  isWdkChainId,
   WDK_PACKAGES,
 } from "@/lib/wdkRegistry";
 
@@ -28,5 +29,11 @@ describe("wdkRegistry", () => {
   it("exposes read paths for non-EVM chains while blocking writes", () => {
     expect(CHAIN_RUNTIME_CAPS.solana.tetherBalanceRead).toBe(true);
     expect(CHAIN_RUNTIME_CAPS.solana.writeTransferUsdT).toBe(false);
+  });
+
+  it("narrows known WDK chain ids for wallet facade validation", () => {
+    expect(isWdkChainId("ethereum")).toBe(true);
+    expect(isWdkChainId("bitcoin")).toBe(false);
+    expect(isWdkChainId("")).toBe(false);
   });
 });

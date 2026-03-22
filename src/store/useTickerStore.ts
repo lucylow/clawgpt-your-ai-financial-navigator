@@ -1,17 +1,17 @@
 import { create } from "zustand";
 import type { TickerTransaction, Transaction } from "@/types";
-import { formatCompactAge, mapPortfolioTransaction, mockTickerTransaction } from "@/lib/tickerUtils";
+import { formatCompactAge, mapPortfolioTransaction, sampleTickerTransaction } from "@/lib/tickerUtils";
 
 interface TickerState {
-  demoTransactions: TickerTransaction[];
-  addDemoTransaction: () => void;
-  clearDemo: () => void;
+  pulseTransactions: TickerTransaction[];
+  addPulseTransaction: () => void;
+  clearPulse: () => void;
 }
 
 export function mergeTickerFeed(
   portfolioTransactions: Transaction[],
-  demoTransactions: TickerTransaction[],
-  now: number
+  pulseTransactions: TickerTransaction[],
+  now: number,
 ): TickerTransaction[] {
   const mapped = portfolioTransactions.map((tx) => mapPortfolioTransaction(tx, now));
   const withAge = (t: TickerTransaction) => ({
@@ -21,7 +21,7 @@ export function mergeTickerFeed(
 
   const seen = new Set<string>();
   const out: TickerTransaction[] = [];
-  for (const t of [...demoTransactions.map(withAge), ...mapped.map(withAge)]) {
+  for (const t of [...pulseTransactions.map(withAge), ...mapped.map(withAge)]) {
     if (seen.has(t.id)) continue;
     seen.add(t.id);
     out.push(t);
@@ -32,23 +32,23 @@ export function mergeTickerFeed(
 }
 
 export const useTickerStore = create<TickerState>((set) => ({
-  demoTransactions: [],
+  pulseTransactions: [],
 
-  addDemoTransaction: () => {
-    const tx = mockTickerTransaction();
+  addPulseTransaction: () => {
+    const tx = sampleTickerTransaction();
     set((state) => ({
-      demoTransactions: [tx, ...state.demoTransactions].slice(0, 25),
+      pulseTransactions: [tx, ...state.pulseTransactions].slice(0, 25),
     }));
 
     const id = tx.id;
     window.setTimeout(() => {
       set((s) => ({
-        demoTransactions: s.demoTransactions.map((t) =>
-          t.id === id && t.status === "pending" ? { ...t, status: "confirmed" as const } : t
+        pulseTransactions: s.pulseTransactions.map((t) =>
+          t.id === id && t.status === "pending" ? { ...t, status: "confirmed" as const } : t,
         ),
       }));
     }, 3000);
   },
 
-  clearDemo: () => set({ demoTransactions: [] }),
+  clearPulse: () => set({ pulseTransactions: [] }),
 }));

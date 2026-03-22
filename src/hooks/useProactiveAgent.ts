@@ -6,7 +6,7 @@ const DEDUPE_MS = 5 * 60_000;
 
 /**
  * OpenClaw-style proactive loop: scans portfolio periodically and emits at most one insight
- * per dedupe window (demo + live store).
+ * per dedupe window (local + WDK live store).
  */
 export function useProactiveAgent(opts: {
   enabled: boolean;

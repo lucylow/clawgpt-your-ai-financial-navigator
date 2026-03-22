@@ -54,7 +54,7 @@ export function scanProactiveInsights(): ProactiveInsight | null {
       const card: Extract<ChatCardPayload, { kind: "opportunity" }> = {
         kind: "opportunity",
         summary: "Idle USDT detected — lower-fee execution chain available",
-        suggestedAction: `Bridge ${amount} USDt → ${toChain} (demo allocation sim)`,
+        suggestedAction: `Bridge ${amount} USDt → ${toChain} (allocation preview)`,
         fromChain: chain,
         toChain,
         amount,
@@ -68,7 +68,7 @@ export function scanProactiveInsights(): ProactiveInsight | null {
         id: id(),
         content:
           `**Idle USDT detected** on **${chain}** (~$${Math.round(usdt).toLocaleString()}). ` +
-          `Suggested: move **$${amount}** toward **${toChain}** for cheaper recurring execution (demo policy).`,
+          `Suggested: move **$${amount}** toward **${toChain}** for cheaper recurring execution (policy preview).`,
         card,
       };
     }

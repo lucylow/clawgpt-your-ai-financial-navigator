@@ -18,6 +18,7 @@ function Child() {
 describe("ProtectedRoute", () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
+    localStorage.removeItem("claw_wallet_session");
     localStorage.removeItem("clawgpt_demo_wallet_connected");
   });
 
@@ -74,14 +75,14 @@ describe("ProtectedRoute", () => {
     expect(screen.getByTestId("protected-child")).toBeInTheDocument();
   });
 
-  it("renders children when demo wallet flag is set (non-strict auth)", () => {
+  it("renders children when wallet session flag is set (non-strict auth)", () => {
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
       loading: false,
       signOut: vi.fn(),
     });
-    localStorage.setItem("clawgpt_demo_wallet_connected", "1");
+    localStorage.setItem("claw_wallet_session", "1");
 
     render(
       <MemoryRouter initialEntries={["/app"]}>

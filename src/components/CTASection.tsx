@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import DemoWalletButton from "@/components/DemoWalletButton";
+import WalletConnectButton from "@/components/WalletConnectButton";
 
 export default function CTASection() {
   const [email, setEmail] = useState("");
@@ -21,7 +21,7 @@ export default function CTASection() {
               Ready to take control?
             </h2>
             <p className="mb-8 text-base text-muted-foreground md:text-lg md:leading-relaxed">
-              Sign in for a synced cockpit session, launch the demo wallet for instant exploration, or join the waitlist for
+              Sign in for a synced cockpit session, connect your wallet for instant exploration, or join the waitlist for
               product updates.
             </p>
 
@@ -32,7 +32,7 @@ export default function CTASection() {
               >
                 Sign in to cockpit
               </Link>
-              <DemoWalletButton variant="compact" className="min-h-[48px] justify-center sm:min-w-[200px]" />
+              <WalletConnectButton variant="compact" className="min-h-[48px] justify-center sm:min-w-[200px]" />
             </div>
 
             {submitted ? (

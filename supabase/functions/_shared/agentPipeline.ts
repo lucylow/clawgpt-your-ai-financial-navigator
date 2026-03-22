@@ -573,14 +573,19 @@ export function runAgentPipeline(
     confidence,
     entities,
     assumptions: [
-      "Demo portfolio and tools may differ from a connected WDK wallet — label uncertainty when applicable.",
+      "Local portfolio snapshot may differ from a live WDK wallet — label uncertainty when applicable.",
       sessionMemory?.automationPaused ? "Session notes: automation paused." : "",
-      sessionMemory?.demoMode ? "Demo mode — treat execution as simulated; onchain settlement is not claimed." : "",
+      sessionMemory?.localPortfolio
+        ? "Local portfolio path — treat execution as preview; on-chain settlement is not claimed until signed."
+        : "",
       sessionMemory?.maxSingleTxUsd != null
         ? `User policy: max single outgoing leg ~$${sessionMemory.maxSingleTxUsd} USD notional — do not propose larger transfers without explicit user override.`
         : "",
       sessionMemory?.approvedChainKeys?.length
         ? `User-approved chains this session: ${sessionMemory.approvedChainKeys.join(", ")} — if a route leaves this set, explain and ask before execution tools.`
+        : "",
+      sessionMemory?.conversationSummary
+        ? `Conversation summary (client, truncated): ${sessionMemory.conversationSummary.slice(0, 1200)}`
         : "",
     ].filter(Boolean),
     missingFields: missing,

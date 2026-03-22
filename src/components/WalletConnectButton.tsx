@@ -4,41 +4,41 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useDemoStore } from "@/store/useDemoStore";
+import { useWalletSessionStore } from "@/store/useWalletSessionStore";
 
 type Variant = "hero" | "compact" | "inline";
 
-interface DemoWalletButtonProps {
+interface WalletConnectButtonProps {
   className?: string;
   variant?: Variant;
   navigateToApp?: boolean;
 }
 
-export default function DemoWalletButton({
+export default function WalletConnectButton({
   className,
   variant = "hero",
   navigateToApp = true,
-}: DemoWalletButtonProps) {
+}: WalletConnectButtonProps) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const [busy, setBusy] = useState(false);
-  const connectDemoWallet = useDemoStore((s) => s.connectDemoWallet);
-  const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
-  const walletConnectPhase = useDemoStore((s) => s.walletConnectPhase);
+  const connectWallet = useWalletSessionStore((s) => s.connectWallet);
+  const isWalletConnected = useWalletSessionStore((s) => s.isWalletConnected);
+  const walletConnectPhase = useWalletSessionStore((s) => s.walletConnectPhase);
 
   const handleClick = async () => {
     setBusy(true);
     try {
-      await connectDemoWallet();
-      const mode = useDemoStore.getState().walletMode;
+      await connectWallet();
+      const mode = useWalletSessionStore.getState().walletMode;
       if (mode === "wdk") {
-        toast.success("Real WDK wallet connected", {
-          description: "Testnet RPCs — fund from faucets, then refresh balances in the cockpit.",
+        toast.success("Wallet connected", {
+          description: "Multi-chain session active — fund from faucets, then refresh balances in the cockpit.",
           duration: 5000,
         });
       } else {
-        toast.success("Demo wallet connected!", {
-          description: "6-chain portfolio loaded — welcome to the cockpit.",
+        toast.success("Wallet ready", {
+          description: "Portfolio loaded across networks — welcome to the cockpit.",
           duration: 4000,
         });
       }
@@ -71,18 +71,18 @@ export default function DemoWalletButton({
         },
       };
 
-  if (isDemoWalletConnected && navigateToApp) {
+  if (isWalletConnected && navigateToApp) {
     return (
       <Link
         to="/app"
-        data-track="demo_open_cockpit"
+        data-track="open_cockpit"
         className={cn(
           "inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-300",
           variant === "hero" && "px-8 py-3.5 text-base min-h-[52px] shadow-lg shadow-indigo-500/20",
           variant === "compact" && "px-4 py-2 text-sm",
           variant === "inline" && "px-3 py-1.5 text-xs",
           "border border-[#6366f1]/40 bg-[#1A1F2E]/90 text-[#F8FAFC] hover:border-[#8b5cf6]/60 hover:bg-[#1A1F2E]",
-          className
+          className,
         )}
       >
         <Sparkles className="h-4 w-4 shrink-0 text-[#a5b4fc]" aria-hidden />
@@ -95,7 +95,7 @@ export default function DemoWalletButton({
     <motion.button
       type="button"
       disabled={busy}
-      data-track="demo_launch_wallet"
+      data-track="connect_wallet_launch"
       onClick={handleClick}
       {...baseMotion}
       className={cn(
@@ -105,14 +105,14 @@ export default function DemoWalletButton({
         variant === "hero" && "px-8 py-3.5 text-base min-h-[52px]",
         variant === "compact" && "px-4 py-2 text-sm min-h-[44px]",
         variant === "inline" && "px-3 py-1.5 text-xs min-h-[36px]",
-        className
+        className,
       )}
     >
       <Sparkles className="h-5 w-5 shrink-0 opacity-95 sm:h-6 sm:w-6" aria-hidden />
       <span className="sr-only" aria-live="polite">
         {busy && walletConnectPhase ? walletConnectPhase : busy ? "Connecting" : ""}
       </span>
-      {busy ? walletConnectPhase ?? "Connecting…" : "Launch demo"}
+      {busy ? walletConnectPhase ?? "Connecting…" : "Connect wallet"}
     </motion.button>
   );
 }

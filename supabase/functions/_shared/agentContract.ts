@@ -78,7 +78,7 @@ export type SessionMemoryV1 = {
   activeWalletLabel?: string;
   automationPaused?: boolean;
   dailyLimitUsd?: number;
-  demoMode?: boolean;
+  localPortfolio?: boolean;
   /** Client user-policy hint: max outgoing notional (USD) for a single leg. */
   maxSingleTxUsd?: number;
   /** Client user-policy hint: allowed chain ids for this session. */
@@ -90,6 +90,9 @@ export type SessionMemoryV1 = {
   /** Client may echo last structured plan for UI; server can rebuild from intent. */
   structuredPlanSnapshot?: StructuredPlanV1;
   userPaused?: boolean;
+  /** Rolling summary + navigator prompt layers from client (ClawGPT pipeline). */
+  conversationSummary?: string;
+  clawNavigatorAugmentation?: string;
 };
 
 export type ExtractedEntities = {

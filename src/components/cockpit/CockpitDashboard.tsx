@@ -23,7 +23,7 @@ export default function CockpitDashboard() {
     if (safeTotalValue <= 0) {
       return (
         <>
-          Connect a wallet or use demo mode, then ask Claw for a balance breakdown by chain.
+          Connect a wallet, then ask Claw for a balance breakdown by chain.
         </>
       );
     }

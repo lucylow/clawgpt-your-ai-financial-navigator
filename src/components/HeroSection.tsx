@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
-import DemoWalletButton from "@/components/DemoWalletButton";
+import WalletConnectButton from "@/components/WalletConnectButton";
 import OrbitalParticles from "@/components/OrbitalParticles";
 import { ClawLogo } from "@/components/ClawLogo";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,7 @@ export default function HeroSection() {
 
           <p className="mx-auto mb-6 max-w-2xl text-lg leading-relaxed text-[#94A3B8] md:text-2xl md:leading-relaxed">
             One cockpit for balances, live activity, and an AI assistant that proposes plans — you confirm before anything
-            moves on-chain (or in demo).
+            moves on-chain (or in preview).
           </p>
 
           <ul className="mx-auto mb-10 flex max-w-xl flex-col gap-2 rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.04] to-transparent px-4 py-4 text-left text-sm text-[#CBD5E1] shadow-inner shadow-black/20 sm:px-5 sm:text-base">
@@ -76,7 +76,7 @@ export default function HeroSection() {
 
           <div className="flex w-full max-w-xl flex-col gap-3 sm:mx-auto">
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <DemoWalletButton
+              <WalletConnectButton
                 variant="hero"
                 className="gradient-glow-cta w-full min-h-[56px] text-lg sm:w-auto sm:min-w-[min(100%,14rem)] sm:px-10 sm:text-xl"
               />
@@ -89,10 +89,10 @@ export default function HeroSection() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
               <a
-                href="#demo"
+                href="#cockpit"
                 className="inline-flex h-12 min-h-[48px] w-full items-center justify-center rounded-xl border border-border/80 bg-secondary/40 px-6 text-base font-semibold text-foreground backdrop-blur-md transition-colors hover:border-primary/40 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto sm:px-8"
               >
-                Watch demo
+                See cockpit
               </a>
               <a
                 href="#journey"
@@ -104,7 +104,7 @@ export default function HeroSection() {
           </div>
 
           <p className="mt-8 text-sm text-[#94A3B8]">
-            Mock demo — no API keys. Already have an account?{" "}
+            No API keys required to explore. Already have an account?{" "}
             <Link to="/auth" className="font-medium text-[#a5b4fc] underline-offset-4 hover:text-[#c4b5fd] hover:underline">
               Sign in
             </Link>{" "}

@@ -80,7 +80,7 @@ export default function DemoSection() {
       const m = next[index];
       if (!m?.pendingReview) return prev;
       const { pendingReview, ...rest } = m;
-      next[index] = { ...rest, text: `Confirmed: ${pendingReview.summary}. Updating demo ticker…` };
+      next[index] = { ...rest, text: `Confirmed: ${pendingReview.summary}. Updating ticker…` };
       next.push({
         from: "claw",
         text: "Done. Ask for **balances**, start a **swap**, or describe another task — same review pattern as the real cockpit.",
@@ -104,7 +104,7 @@ export default function DemoSection() {
   };
 
   return (
-    <section id="demo" className="relative scroll-mt-24 py-24 px-4">
+    <section id="cockpit" className="relative scroll-mt-24 py-24 px-4">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
       <div className="max-w-6xl mx-auto">
         <div className="mb-16 text-center">

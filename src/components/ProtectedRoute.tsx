@@ -2,7 +2,7 @@ import { type ReactNode, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { COCKPIT_APP_BASE } from "@/config/routes";
-import { DEMO_SESSION_KEY } from "@/lib/demoWallet";
+import { isWalletSessionActive } from "@/lib/demoWallet";
 import { isBrowseSessionActive } from "@/lib/cockpitAccess";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,7 +11,7 @@ interface Props {
 }
 
 /**
- * Cockpit guard: Supabase session, or (unless `VITE_REQUIRE_AUTH_FOR_APP=true`) demo wallet or browse flag.
+ * Cockpit guard: Supabase session, or (unless `VITE_REQUIRE_AUTH_FOR_APP=true`) wallet session or browse flag.
  * Unauthenticated users are sent to `/auth?redirect=…` for post-login return.
  */
 export default function ProtectedRoute({ children }: Props) {
@@ -22,10 +22,9 @@ export default function ProtectedRoute({ children }: Props) {
 
   useEffect(() => {
     if (loading) return;
-    const demo =
-      typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+    const walletSession = isWalletSessionActive();
     const browse = isBrowseSessionActive();
-    const allowDevBypass = !requireAuthOnly && (demo || browse);
+    const allowDevBypass = !requireAuthOnly && (walletSession || browse);
     if (session || allowDevBypass) return;
     const next = `${location.pathname}${location.search}`;
     const redirect = encodeURIComponent(next.startsWith("/") ? next : COCKPIT_APP_BASE);
@@ -40,10 +39,9 @@ export default function ProtectedRoute({ children }: Props) {
     );
   }
 
-  const demoConnected =
-    typeof localStorage !== "undefined" && localStorage.getItem(DEMO_SESSION_KEY) === "1";
+  const walletConnected = isWalletSessionActive();
   const browseOnly = isBrowseSessionActive();
-  const allowDevBypass = !requireAuthOnly && (demoConnected || browseOnly);
+  const allowDevBypass = !requireAuthOnly && (walletConnected || browseOnly);
   if (!session && !allowDevBypass) return null;
 
   return <>{children}</>;

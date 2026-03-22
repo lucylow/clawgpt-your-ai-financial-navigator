@@ -30,7 +30,7 @@ export interface Transaction {
   timestamp: number;
 }
 
-/** Display model for the live transaction ticker (UI + demo feed) */
+/** Display model for the live transaction ticker (UI + pulse feed) */
 export type TickerTxType = "sent" | "received" | "deposit" | "withdraw" | "bridge" | "swap";
 
 export interface TickerTransaction {
@@ -87,7 +87,7 @@ export type ChatCardPayload =
       principalRisks?: string[];
       liquidityImpact?: string;
       diversificationDelta?: "improves" | "worsens" | "neutral";
-      /** Chain → weight 0–1 after the move (demo / preview) */
+      /** Chain → weight 0–1 after the move (preview) */
       postTradeChainWeights?: Record<string, number>;
       /** Must match the benefit assumption used when the card was generated (for confirm-time checks) */
       policyBenefitUsd?: number;
@@ -120,7 +120,7 @@ export interface SessionImpactV1 {
   userTurns: number;
   /** Assistant replies that included a structured card (transfer / opportunity / plan). */
   structuredPreviews: number;
-  /** User completed a confirmed on-chain or demo execution path. */
+  /** User completed a confirmed on-chain or local execution path. */
   confirmedActions: number;
   /** Policy / safety / validation stopped a risky path. */
   preventedMistakes: number;

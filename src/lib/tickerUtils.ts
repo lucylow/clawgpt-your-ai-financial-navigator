@@ -61,19 +61,19 @@ export function mapPortfolioTransaction(tx: Transaction, now = Date.now()): Tick
   };
 }
 
-const DEMO_CHAINS = ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"] as const;
-const DEMO_ASSETS = ["USDt", "XAUt"] as const;
+const SAMPLE_CHAINS = ["ethereum", "polygon", "arbitrum", "solana", "tron", "ton"] as const;
+const SAMPLE_ASSETS = ["USDt", "XAUt"] as const;
 
-export function mockTickerTransaction(): TickerTransaction {
-  const chain = DEMO_CHAINS[Math.floor(Math.random() * DEMO_CHAINS.length)];
+export function sampleTickerTransaction(): TickerTransaction {
+  const chain = SAMPLE_CHAINS[Math.floor(Math.random() * SAMPLE_CHAINS.length)];
   const chainTo =
-    Math.random() > 0.65 ? DEMO_CHAINS[Math.floor(Math.random() * DEMO_CHAINS.length)] : undefined;
-  const asset = DEMO_ASSETS[Math.floor(Math.random() * DEMO_ASSETS.length)];
+    Math.random() > 0.65 ? SAMPLE_CHAINS[Math.floor(Math.random() * SAMPLE_CHAINS.length)] : undefined;
+  const asset = SAMPLE_ASSETS[Math.floor(Math.random() * SAMPLE_ASSETS.length)];
   const amount = Math.round((10 + Math.random() * 5000) * 1000) / 1000;
   const types: TickerTxType[] = ["sent", "received", "deposit", "bridge", "swap"];
   const type = types[Math.floor(Math.random() * types.length)];
   const ts = Date.now();
-  const id = `demo-${crypto.randomUUID()}`;
+  const id = `pulse-${crypto.randomUUID()}`;
   const hash = `0x${Array.from({ length: 8 }, () =>
     Math.floor(Math.random() * 16).toString(16)
   ).join("")}…`;

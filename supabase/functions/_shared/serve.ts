@@ -121,9 +121,11 @@ export async function handleAgentChatRequest(req: Request): Promise<Response> {
     const pipeline = runAgentPipeline(content, conversationHistory, correlationId, sessionMemory);
     structuredLog("info", "agent_pipeline", { correlationId, ...pipeline.telemetry });
 
+    const navigatorAug = sessionMemory?.clawNavigatorAugmentation?.trim();
     const messages: Array<{ role: string; content: string }> = [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "system", content: pipeline.systemInjection },
+      ...(navigatorAug ? [{ role: "system" as const, content: navigatorAug }] : []),
       ...conversationHistory.slice(-20),
       { role: "user", content },
     ];

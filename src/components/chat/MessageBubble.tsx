@@ -10,7 +10,7 @@ interface MessageBubbleProps {
   onWizardDone?: (messageId: string) => void;
   onConfirmTransaction?: (card: Extract<ChatCardPayload, { kind: "transaction_ready" }>) => void | Promise<void>;
   onConfirmOpportunity?: (card: Extract<ChatCardPayload, { kind: "opportunity" }>) => void | Promise<void>;
-  /** Overrides default "Confirm (demo)" / WDK labels from parent */
+  /** Overrides default confirm labels from parent */
   confirmTransactionLabel?: string;
   confirmOpportunityLabel?: string;
 }
@@ -21,8 +21,8 @@ export default function MessageBubble({
   onWizardDone,
   onConfirmTransaction,
   onConfirmOpportunity,
-  confirmTransactionLabel = "Confirm (demo)",
-  confirmOpportunityLabel = "Apply suggestion (demo)",
+  confirmTransactionLabel = "Confirm transaction",
+  confirmOpportunityLabel = "Apply suggestion",
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const step = message.wizardStep ?? 0;

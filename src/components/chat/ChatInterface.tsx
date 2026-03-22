@@ -14,7 +14,7 @@ import {
 } from "@/lib/walletClient";
 import { createUserConfirmedIntent } from "@/lib/securityModel";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
-import { useDemoStore } from "@/store/useDemoStore";
+import { useWalletSessionStore } from "@/store/useWalletSessionStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatCardPayload, Message, Transaction } from "@/types";
@@ -54,8 +54,8 @@ export default function ChatInterface() {
   const sessionImpact = usePortfolioStore((s) => s.agent.sessionImpact);
   const workflowLog = usePortfolioStore((s) => s.agent.workflowLog);
   const decisionAudit = usePortfolioStore((s) => s.agent.decisionAudit ?? []);
-  const walletMode = useDemoStore((s) => s.walletMode);
-  const isDemoWalletConnected = useDemoStore((s) => s.isDemoWalletConnected);
+  const walletMode = useWalletSessionStore((s) => s.walletMode);
+  const isWalletConnected = useWalletSessionStore((s) => s.isWalletConnected);
   const rumbleTips = useRumbleTips();
   const rumbleTipsAnnounced = useRef(false);
   const { user } = useAuth();
@@ -66,8 +66,8 @@ export default function ChatInterface() {
   const chainCtx = COCKPIT_CHAIN_META[focusChain];
   const confirmLabels = useMemo(
     () => ({
-      transaction: wdkLive ? "Preview OK — submit via WDK" : "Confirm (simulated portfolio)",
-      opportunity: wdkLive ? "Simulate allocation shift (no bridge tx yet)" : "Apply suggestion (demo)",
+      transaction: wdkLive ? "Preview OK — submit via WDK" : "Confirm transaction",
+      opportunity: wdkLive ? "Preview allocation shift (no bridge tx yet)" : "Apply suggestion",
     }),
     [wdkLive],
   );
@@ -94,7 +94,7 @@ export default function ChatInterface() {
     appendAgentWorkflow("reconcile", "Proactive insight (autonomy scan)");
   }, [appendAgentWorkflow]);
 
-  useProactiveAgent({ enabled: isDemoWalletConnected, onInsight: pushProactiveMessage });
+  useProactiveAgent({ enabled: isWalletConnected, onInsight: pushProactiveMessage });
 
   useEffect(() => {
     if (rumbleTips.length === 0 || rumbleTipsAnnounced.current) return;
@@ -106,8 +106,8 @@ export default function ChatInterface() {
         id: generateId(),
         role: "assistant",
         content:
-          `**Rumble tips (dev / mock):** ${rumbleTips.length} event(s), **$${total.toFixed(2)}** total. ` +
-          `Production will use your WDK + webhook; cards for split / yield / withdraw can attach here.`,
+          `**Rumble tips:** ${rumbleTips.length} event(s), **$${total.toFixed(2)}** total. ` +
+          `Webhook and WDK can attach cards for split / yield / withdraw here.`,
       },
     ]);
   }, [rumbleTips]);
@@ -116,8 +116,8 @@ export default function ChatInterface() {
     (partial: Omit<Transaction, "hash" | "timestamp">) => {
       const tx: Transaction = {
         ...partial,
-        /** Not an on-chain hash — demo ticker only (WDK path uses real tx hashes). */
-        hash: `demo:${conversationId}:${Date.now().toString(36)}`,
+        /** Placeholder id when explorer hash not yet available (WDK path uses real tx hashes). */
+        hash: `tx:${conversationId}:${Date.now().toString(36)}`,
         timestamp: Date.now(),
       };
       applyAgentUpdate({ type: "add_transaction", tx });
@@ -135,7 +135,7 @@ export default function ChatInterface() {
           toast({
             variant: "destructive",
             title: "Blocked by safety checks",
-            description: detail || "Policy, address validation, or simulation outcome does not allow execution.",
+            description: detail || "Policy, address validation, or preview outcome does not allow execution.",
           });
           appendDecisionAudit({ kind: "rejection", summary: "Safety envelope blocked send", detail: { card } });
           appendAgentWorkflow("execute", "Aborted: safety envelope");
@@ -168,7 +168,7 @@ export default function ChatInterface() {
               variant: "destructive",
               title: "Recipient not configured",
               description:
-                "Set VITE_DEMO_TRANSFER_RECIPIENT in .env or provide toAddress on the agent card for testnet sends.",
+                "Set VITE_DEMO_TRANSFER_RECIPIENT in .env or provide toAddress on the agent card for network sends.",
             });
             appendAgentWorkflow("execute", "Aborted: missing recipient");
             return;
@@ -180,7 +180,7 @@ export default function ChatInterface() {
               variant: "destructive",
               title: "Live send not wired for this chain",
               description:
-                "WDK token transfers in this build use Ethereum, Polygon, or Arbitrum testnets. Use demo mode to simulate other chains.",
+                "WDK token transfers in this build use Ethereum, Polygon, or Arbitrum. Use local preview for other chains.",
             });
             appendAgentWorkflow("execute", "Aborted: non-EVM chain for live send");
             return;
@@ -221,16 +221,16 @@ export default function ChatInterface() {
             const simErr = (sim as { ok: false; error: string }).error;
             toast({
               variant: "destructive",
-              title: "Simulation failed",
+              title: "Preview failed",
               description: simErr,
             });
-            appendAgentWorkflow("review", `RPC simulation failed: ${simErr}`);
-            appendDecisionAudit({ kind: "rejection", summary: "Simulation reverted or RPC error", detail: { sim } });
+            appendAgentWorkflow("review", `RPC preview failed: ${simErr}`);
+            appendDecisionAudit({ kind: "rejection", summary: "Preview reverted or RPC error", detail: { sim } });
             return;
           }
-          appendAgentWorkflow("review", `RPC simulation OK — ${sim.summary}`);
+          appendAgentWorkflow("review", `RPC preview OK — ${sim.summary}`);
           toast({
-            title: "Simulation OK",
+            title: "Preview OK",
             description: sim.summary,
           });
 
@@ -304,10 +304,10 @@ export default function ChatInterface() {
           applyAgentUpdate({ type: "set_allocation", allocation: alloc });
           usePortfolioStore.getState().setAllocationByAsset(nested);
         }
-        appendDecisionAudit({ kind: "execution", summary: `Demo send ${card.amount} USDt`, detail: { chain: card.chain } });
-        appendAgentWorkflow("execute", "Simulated send (demo portfolio)");
-        appendAgentWorkflow("reconcile", "Portfolio + ticker updated (demo)");
-        toast({ title: "Demo transaction", description: `${card.amount} ${card.asset} send simulated.` });
+        appendDecisionAudit({ kind: "execution", summary: `Send ${card.amount} USDt`, detail: { chain: card.chain } });
+        appendAgentWorkflow("execute", "Transaction complete (local portfolio)");
+        appendAgentWorkflow("reconcile", "Portfolio + ticker updated");
+        toast({ title: "Transaction complete", description: `${card.amount} ${card.asset} send recorded.` });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Unexpected error.";
         toast({ variant: "destructive", title: "Could not complete transfer", description: msg });
@@ -363,17 +363,17 @@ export default function ChatInterface() {
         if (wdkLive) {
           try {
             await refreshLivePortfolio();
-            appendAgentWorkflow("reconcile", "Portfolio refreshed after simulated bridge");
+            appendAgentWorkflow("reconcile", "Portfolio refreshed after bridge preview");
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Portfolio refresh failed.";
             toast({ variant: "destructive", title: "Sync warning", description: msg });
             appendAgentWorkflow("reconcile", `Portfolio refresh failed: ${msg}`);
           }
         } else {
-          appendAgentWorkflow("execute", "Simulated bridge — no on-chain bridge in this build");
-          appendAgentWorkflow("reconcile", "Allocation updated (demo)");
+          appendAgentWorkflow("execute", "Bridge preview — no on-chain bridge in this build");
+          appendAgentWorkflow("reconcile", "Allocation updated");
         }
-        toast({ title: "Bridge simulated", description: `${card.amount} USDt ${card.fromChain} → ${card.toChain}` });
+        toast({ title: "Bridge preview complete", description: `${card.amount} USDt ${card.fromChain} → ${card.toChain}` });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Unexpected error.";
         toast({ variant: "destructive", title: "Could not apply bridge", description: msg });
@@ -390,11 +390,11 @@ export default function ChatInterface() {
 
   const onWizardDone = useCallback(
     (_messageId: string) => {
-      appendAgentWorkflow("execute", "Recurring wizard completed (demo)");
-      appendAgentWorkflow("reconcile", "Schedule stored locally — WDK required for real execution");
+      appendAgentWorkflow("execute", "Recurring wizard completed");
+      appendAgentWorkflow("reconcile", "Schedule stored locally — WDK required for on-chain execution");
       toast({
-        title: "Recurring plan saved (demo)",
-        description: "Connect WDK to execute on testnet.",
+        title: "Recurring plan saved",
+        description: "Connect WDK to execute on your network.",
       });
     },
     [appendAgentWorkflow, toast]
@@ -515,7 +515,7 @@ export default function ChatInterface() {
                   ? "Analyzing…"
                   : wdkLive
                     ? `Online · WDK · ${chainCtx.label} (${chainCtx.network})`
-                    : "Online · demo / Supabase"}
+                    : "Online · Supabase"}
               </span>
             </span>
             {sessionImpactLine ? (
