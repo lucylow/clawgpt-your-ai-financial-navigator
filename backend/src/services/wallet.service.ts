@@ -4,7 +4,7 @@
  */
 
 import { generateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { wordlist } from "@scure/bip39/wordlists/english";
 import type { PrismaClient } from "@prisma/client";
 import { decryptUtf8, encryptUtf8, parseVault, serializeVault } from "../lib/cryptoVault.js";
 import type { AgentChainId, MultiChainBalances, TetherAssetSymbol } from "../lib/constants.js";
