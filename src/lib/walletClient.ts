@@ -248,12 +248,12 @@ export async function simulateTetherTransfer(params: SendTransactionParams): Pro
     }
 
     const caps = getRuntimeCapabilities(chain);
-    if (caps.evmTransferPreview) {
+    if (caps.evmTransferPreview && (chain === "ethereum" || chain === "polygon" || chain === "arbitrum")) {
       const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
       const from = await clawWdk.getSignerAddressForChain(chain);
       const sim = await simulateTetherEvmTransfer(chain, from, params.to.trim(), params.amount, asset);
       if (!sim.ok) {
-        return { ok: false, error: sim.error };
+        return { ok: false, error: (sim as { ok: false; error: string }).error };
       }
       return { ok: true, evm: true, summary: formatGasSummary(sim) };
     }
