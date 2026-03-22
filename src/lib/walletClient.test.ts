@@ -6,10 +6,13 @@ const { mockIsReady, mockSendTetherTransfer } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/wdkClient", () => ({
-  clawWdk: {
-    isReady: () => mockIsReady(),
-    sendTetherTransfer: (args: unknown) => mockSendTetherTransfer(args),
-  },
+  loadWdkModule: () => Promise.resolve({
+    clawWdk: {
+      isReady: () => mockIsReady(),
+      sendTetherTransfer: (args: unknown) => mockSendTetherTransfer(args),
+      getSignerAddressForChain: () => "0x0000000000000000000000000000000000000001",
+    },
+  }),
 }));
 
 describe("walletClient sendTransaction", () => {
