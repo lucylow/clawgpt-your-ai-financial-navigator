@@ -12,12 +12,6 @@
 
 **Quick start:** `npm install` → copy `.env.example` to `.env` → `npm run dev` → open [http://localhost:8080](http://localhost:8080). **Mock agent** is the default for demos (`VITE_USE_MOCK_AGENT` — see `.env.example`).
 
-### 60-second demo (fully mocked UI)
-
-1. `npm install` and `npm run dev`
-2. Open `http://localhost:8080` and click **Use Demo Wallet** (no Supabase sign-in, no API keys)
-3. The cockpit loads a **mock 6-chain portfolio**; chat **show portfolio** and watch the dashboard and ticker
-
 **Docs:** [AGENTS.md](AGENTS.md) · [docs/WDK.md](docs/WDK.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) · [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 
 **Boundaries:** `src/lib/agentClient.ts` (`sendMessage`) · `src/lib/walletClient.ts` (WDK-ready stubs)
