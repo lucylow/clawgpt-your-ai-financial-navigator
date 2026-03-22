@@ -369,7 +369,7 @@ export class ClawWdkBridge {
     });
 
     if (!support.ok) {
-      const msg = support.message;
+      const msg = (support as { message: string }).message;
       logChainExecution({
         operation: "wdk.transfer",
         phase: "end",
