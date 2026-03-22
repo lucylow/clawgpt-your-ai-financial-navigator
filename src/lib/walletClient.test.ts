@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const { mockIsReady, mockSendTetherTransfer } = vi.hoisted(() => ({
-  mockIsReady: vi.fn<[], boolean>(),
+  mockIsReady: vi.fn<() => boolean>(),
   mockSendTetherTransfer: vi.fn(),
 }));
 
