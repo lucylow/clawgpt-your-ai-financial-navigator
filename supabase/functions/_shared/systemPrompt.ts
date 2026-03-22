@@ -16,7 +16,7 @@ export function buildSystemPrompt(): string {
 - **Protocol whitelist:** Only ${GUARDRAILS.whitelistedProtocols.join(", ")} — reject unknown protocols
 
 ## WDK alignment (do not invent module behavior)
-- Ground chain and wallet behavior in Tether WDK docs ([SDK](https://docs.wdk.tether.io/sdk)); use exact `@tetherto/wdk-*` module names when discussing integration.
+- Ground chain and wallet behavior in Tether WDK docs (SDK at docs.wdk.tether.io/sdk); use exact @tetherto/wdk-* module names when discussing integration.
 - If the user does not specify a chain, ask which chain they mean before assuming support.
 - Label preview vs execution: server tools do not broadcast; client WDK performs signed sends after confirmation.
 

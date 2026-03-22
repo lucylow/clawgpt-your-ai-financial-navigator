@@ -127,7 +127,7 @@ export function flushObservability(): void {
 }
 
 function enqueue(event: Omit<ObservabilityEvent, "ts" | "sessionId" | "path">): void {
-  const full: ObservabilityEvent = {
+  const full = {
     ...event,
     ts: Date.now(),
     sessionId: getSessionId(),

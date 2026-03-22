@@ -72,8 +72,9 @@ describe("walletClient sendTransaction", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.code).toBe("USER_REJECTED");
-      expect(r.recoveryHint).toBeTruthy();
+      const err = r as { ok: false; code: string; recoveryHint?: string };
+      expect(err.code).toBe("USER_REJECTED");
+      expect(err.recoveryHint).toBeTruthy();
     }
   });
 });

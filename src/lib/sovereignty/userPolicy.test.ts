@@ -32,7 +32,7 @@ describe("userPolicy", () => {
     expect(evaluateUserPolicyForBridge(p, { fromChain: "ethereum", toChain: "arbitrum", amountUsd: 50 }).ok).toBe(
       true,
     );
-    const p2 = { ...defaultUserPolicy(), approvedChains: ["ethereum"] };
+    const p2 = { ...defaultUserPolicy(), approvedChains: ["ethereum"] as WdkChainId[] };
     expect(evaluateUserPolicyForBridge(p2, { fromChain: "ethereum", toChain: "arbitrum", amountUsd: 50 }).ok).toBe(
       false,
     );

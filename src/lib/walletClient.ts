@@ -345,17 +345,18 @@ export async function sendTransaction(
     const tw = params.asset === "XAUt" ? "XAUt" : "USDt";
     const transferSupport = getTetherTransferSupport(chain, tw);
     if (!transferSupport.ok) {
+      const tsErr = transferSupport as { ok: false; code: string; packageName: string; message: string };
       logChainExecution({
         operation: "wallet.send_transaction",
         phase: "end",
         chain,
         ok: false,
         error: "capability_unsupported",
-        detail: { code: transferSupport.code, wdkPackage: transferSupport.packageName },
+        detail: { code: tsErr.code, wdkPackage: tsErr.packageName },
       });
       return {
         ok: false,
-        error: transferSupport.message,
+        error: tsErr.message,
         code: "CHAIN_UNSUPPORTED",
       };
     }

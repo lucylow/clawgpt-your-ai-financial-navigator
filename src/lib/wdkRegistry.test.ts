@@ -19,8 +19,9 @@ describe("wdkRegistry", () => {
     const sol = getTetherTransferSupport("solana", "USDt");
     expect(sol.ok).toBe(false);
     if (!sol.ok) {
-      expect(sol.code).toBe("CAPABILITY_UNSUPPORTED");
-      expect(sol.packageName).toBe(WDK_PACKAGES.walletSolana);
+      const err = sol as { code: string; packageName: string };
+      expect(err.code).toBe("CAPABILITY_UNSUPPORTED");
+      expect(err.packageName).toBe(WDK_PACKAGES.walletSolana);
     }
   });
 

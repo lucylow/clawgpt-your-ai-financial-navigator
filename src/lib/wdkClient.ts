@@ -377,7 +377,7 @@ export class ClawWdkBridge {
         durationMs: Math.round(performance.now() - t0),
         ok: false,
         error: msg,
-        detail: { asset, code: support.code },
+        detail: { asset, code: (support as { code: string }).code },
       });
       throw new Error(msg);
     }
