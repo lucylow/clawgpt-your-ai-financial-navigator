@@ -363,13 +363,13 @@ export class ClawWdkBridge {
       detail: {
         asset,
         to: redactRecipient(to),
-        wdkPackage: support.ok ? CHAIN_WALLET_REGISTRY[chain].packageName : support.packageName,
+        wdkPackage: support.ok ? CHAIN_WALLET_REGISTRY[chain].packageName : (support as { packageName: string }).packageName,
         capabilityOk: support.ok,
       },
     });
 
     if (!support.ok) {
-      const msg = support.message;
+      const msg = (support as { message: string }).message;
       logChainExecution({
         operation: "wdk.transfer",
         phase: "end",
@@ -377,7 +377,7 @@ export class ClawWdkBridge {
         durationMs: Math.round(performance.now() - t0),
         ok: false,
         error: msg,
-        detail: { asset, code: support.code },
+        detail: { asset, code: (support as { code: string }).code },
       });
       throw new Error(msg);
     }

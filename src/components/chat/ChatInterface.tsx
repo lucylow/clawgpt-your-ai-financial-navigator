@@ -218,12 +218,13 @@ export default function ChatInterface() {
             asset: card.asset === "XAUt" ? "XAUt" : "USDt",
           });
           if (!sim.ok) {
+            const simErr = (sim as { ok: false; error: string }).error;
             toast({
               variant: "destructive",
               title: "Simulation failed",
-              description: sim.error,
+              description: simErr,
             });
-            appendAgentWorkflow("review", `RPC simulation failed: ${sim.error}`);
+            appendAgentWorkflow("review", `RPC simulation failed: ${simErr}`);
             appendDecisionAudit({ kind: "rejection", summary: "Simulation reverted or RPC error", detail: { sim } });
             return;
           }

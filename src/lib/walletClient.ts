@@ -248,12 +248,12 @@ export async function simulateTetherTransfer(params: SendTransactionParams): Pro
     }
 
     const caps = getRuntimeCapabilities(chain);
-    if (caps.evmTransferPreview) {
+    if (caps.evmTransferPreview && (chain === "ethereum" || chain === "polygon" || chain === "arbitrum")) {
       const asset = params.asset === "XAUt" ? "XAUt" : "USDt";
       const from = await clawWdk.getSignerAddressForChain(chain);
       const sim = await simulateTetherEvmTransfer(chain, from, params.to.trim(), params.amount, asset);
       if (!sim.ok) {
-        return { ok: false, error: sim.error };
+        return { ok: false, error: (sim as { ok: false; error: string }).error };
       }
       return { ok: true, evm: true, summary: formatGasSummary(sim) };
     }
@@ -345,17 +345,18 @@ export async function sendTransaction(
     const tw = params.asset === "XAUt" ? "XAUt" : "USDt";
     const transferSupport = getTetherTransferSupport(chain, tw);
     if (!transferSupport.ok) {
+      const tsErr = transferSupport as { ok: false; code: string; packageName: string; message: string };
       logChainExecution({
         operation: "wallet.send_transaction",
         phase: "end",
         chain,
         ok: false,
         error: "capability_unsupported",
-        detail: { code: transferSupport.code, wdkPackage: transferSupport.packageName },
+        detail: { code: tsErr.code, wdkPackage: tsErr.packageName },
       });
       return {
         ok: false,
-        error: transferSupport.message,
+        error: tsErr.message,
         code: "CHAIN_UNSUPPORTED",
       };
     }

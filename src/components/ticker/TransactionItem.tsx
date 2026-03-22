@@ -66,6 +66,7 @@ export interface TransactionItemProps {
 }
 
 function TransactionItemInner({ tx, compact = false, showTime = true }: TransactionItemProps) {
+  const reduceMotion = useReducedMotion();
   const Icon = txIcons[tx.type] ?? Send;
   const time = new Date(tx.timestamp).toLocaleTimeString("en-US", {
     hour12: false,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { WdkChainId } from "@/config/chains";
 import {
   defaultUserPolicy,
   evaluateUserPolicyForBridge,
@@ -18,7 +19,7 @@ describe("userPolicy", () => {
   });
 
   it("blocks disallowed chain", () => {
-    const p = { ...defaultUserPolicy(), approvedChains: ["arbitrum"] };
+    const p = { ...defaultUserPolicy(), approvedChains: ["arbitrum"] as WdkChainId[] };
     expect(evaluateUserPolicyForTransfer(p, { chain: "ethereum", amountUsd: 1 }).ok).toBe(false);
   });
 
@@ -28,11 +29,11 @@ describe("userPolicy", () => {
   });
 
   it("bridge requires both chains approved", () => {
-    const p = { ...defaultUserPolicy(), approvedChains: ["ethereum", "arbitrum"] };
+    const p = { ...defaultUserPolicy(), approvedChains: ["ethereum", "arbitrum"] as WdkChainId[] };
     expect(evaluateUserPolicyForBridge(p, { fromChain: "ethereum", toChain: "arbitrum", amountUsd: 50 }).ok).toBe(
       true,
     );
-    const p2 = { ...defaultUserPolicy(), approvedChains: ["ethereum"] };
+    const p2 = { ...defaultUserPolicy(), approvedChains: ["ethereum"] as WdkChainId[] };
     expect(evaluateUserPolicyForBridge(p2, { fromChain: "ethereum", toChain: "arbitrum", amountUsd: 50 }).ok).toBe(
       false,
     );
