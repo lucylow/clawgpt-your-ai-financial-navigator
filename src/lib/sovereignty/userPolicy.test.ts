@@ -18,7 +18,7 @@ describe("userPolicy", () => {
   });
 
   it("blocks disallowed chain", () => {
-    const p = { ...defaultUserPolicy(), approvedChains: ["arbitrum"] };
+    const p = { ...defaultUserPolicy(), approvedChains: ["arbitrum"] as WdkChainId[] };
     expect(evaluateUserPolicyForTransfer(p, { chain: "ethereum", amountUsd: 1 }).ok).toBe(false);
   });
 
