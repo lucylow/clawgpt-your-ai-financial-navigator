@@ -263,8 +263,9 @@ export async function streamAgentMessage({
 
             // Check for metadata event (tool results)
             if (parsed.metadata) {
+              const headerCorr = resp.headers.get("x-correlation-id")?.trim();
               onMetadata?.(
-                mergeCorrelationFromHeaders(parsed.metadata as AgentMetadata, sseHeaderCorrelation),
+                mergeCorrelationFromHeaders(parsed.metadata as AgentMetadata, headerCorr),
               );
               continue;
             }
