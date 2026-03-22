@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String   @id @default(cuid())
+  email                    String   @unique
+  passwordHash             String
+  settings                 Json     @default("{}")
+  assetPreferences         Json?
+  spendingLimits           Json?
+  riskProfile              Json?
+  economicPolicy           Json?
+  autonomyOptIn            Boolean  @default(false)
+  microPaymentAutoApprove  Boolean  @default(false)
+  recipientAllowlist       Json?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  wallets    Wallet[]
+  agentPlans AgentPlan[]
+  actionLogs AgentActionLog[]
+}
+
+model Wallet {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label         String   @default("primary")
+  encPayload    String
+  addresses     Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model AgentPlan {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         PlanStatus @default(PENDING)
+  intent         String?
+  steps          Json
+  result         Json?
+  requiresReview Boolean    @default(true)
+  simulation     Json?
+  rationale      String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([userId, status])
+}
+
+enum PlanStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXECUTING
+  COMPLETED
+  FAILED
+}
+
+model AgentActionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  txHash    String?
+  status    String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
