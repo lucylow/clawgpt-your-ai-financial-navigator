@@ -13,25 +13,29 @@ import {
 } from "@/store/useBackendStreamStore";
 import type { Tables } from "@/integrations/supabase/types";
 
+// These tables may not yet exist in the DB schema — use `any` for realtime payloads
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRow = any;
+
 function isTxRow(row: unknown): row is Tables<"transactions"> {
   if (!row || typeof row !== "object") return false;
   const r = row as Record<string, unknown>;
   return typeof r.id === "string" && typeof r.user_id === "string";
 }
 
-function isSnapshotRow(row: unknown): row is Tables<"portfolio_snapshots"> {
+function isSnapshotRow(row: unknown): row is Record<string, unknown> {
   if (!row || typeof row !== "object") return false;
   const r = row as Record<string, unknown>;
   return typeof r.id === "string" && r.payload != null;
 }
 
-function isNotificationRow(row: unknown): row is Tables<"notifications"> {
+function isNotificationRow(row: unknown): row is Record<string, unknown> {
   if (!row || typeof row !== "object") return false;
   const r = row as Record<string, unknown>;
   return typeof r.id === "string" && typeof r.title === "string";
 }
 
-function isActivityRow(row: unknown): row is Tables<"activity_feed"> {
+function isActivityRow(row: unknown): row is Record<string, unknown> {
   if (!row || typeof row !== "object") return false;
   const r = row as Record<string, unknown>;
   return typeof r.id === "string" && typeof r.summary === "string";
@@ -82,29 +86,29 @@ export function useSupabaseEventStream() {
       }
     };
 
-    const onSnapshot = (payload: RealtimePostgresChangesPayload<Tables<"portfolio_snapshots">>) => {
+    const onSnapshot = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
       const row = payload.new;
       if (!isSnapshotRow(row)) return;
       usePortfolioStore.getState().mergeBackendSnapshot(row.payload);
     };
 
-    const onNotification = (payload: RealtimePostgresChangesPayload<Tables<"notifications">>) => {
-      const row = payload.new;
+    const onNotification = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
+      const row = payload.new as Record<string, unknown> | undefined;
       if (!isNotificationRow(row)) return;
       if (payload.eventType === "UPDATE") {
         if (row.read_at) {
-          useBackendStreamStore.getState().patchNotificationRead(row.id, row.read_at);
+          useBackendStreamStore.getState().patchNotificationRead(row.id as string, row.read_at as string);
         }
         return;
       }
       const n: StreamedNotification = {
-        id: row.id,
-        kind: row.kind,
-        title: row.title,
-        body: row.body,
+        id: row.id as string,
+        kind: row.kind as string,
+        title: row.title as string,
+        body: row.body as string | undefined,
         metadata: metadataAsRecord(row.metadata),
-        read_at: row.read_at,
-        created_at: row.created_at,
+        read_at: row.read_at as string | null,
+        created_at: row.created_at as string,
       };
       useBackendStreamStore.getState().pushNotification(n);
       if (n.read_at == null) {
@@ -116,16 +120,16 @@ export function useSupabaseEventStream() {
       }
     };
 
-    const onActivity = (payload: RealtimePostgresChangesPayload<Tables<"activity_feed">>) => {
-      const row = payload.new;
+    const onActivity = (payload: RealtimePostgresChangesPayload<AnyRow>) => {
+      const row = payload.new as Record<string, unknown> | undefined;
       if (!isActivityRow(row)) return;
       const a: StreamedActivityItem = {
-        id: row.id,
-        category: row.category,
-        summary: row.summary,
-        detail: row.detail,
+        id: row.id as string,
+        category: row.category as string,
+        summary: row.summary as string,
+        detail: row.detail as string | undefined,
         metadata: metadataAsRecord(row.metadata),
-        created_at: row.created_at,
+        created_at: row.created_at as string,
       };
       useBackendStreamStore.getState().pushActivity(a);
       const desc = [a.category, a.detail].filter(Boolean).join(" · ") || undefined;
@@ -140,9 +144,9 @@ export function useSupabaseEventStream() {
     const channel = supabase
       .channel(`cockpit-events:${uid}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter }, onTx)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "portfolio_snapshots", filter }, onSnapshot)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter }, onNotification)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_feed", filter }, onActivity)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "portfolio_snapshots", filter }, onSnapshot as never)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter }, onNotification as never)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity_feed", filter }, onActivity as never)
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           setStreamConnected(true);

@@ -126,13 +126,14 @@ export function flushObservability(): void {
   });
 }
 
-function enqueue(event: Omit<ObservabilityEvent, "ts" | "sessionId" | "path">): void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function enqueue(event: any): void {
   const full = {
     ...event,
     ts: Date.now(),
     sessionId: getSessionId(),
     path: currentPath(),
-  } as ObservabilityEvent;
+  };
   queue.push(full);
   persistQueue();
 
