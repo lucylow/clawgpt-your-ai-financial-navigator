@@ -28,7 +28,7 @@ describe("userPolicy", () => {
   });
 
   it("bridge requires both chains approved", () => {
-    const p = { ...defaultUserPolicy(), approvedChains: ["ethereum", "arbitrum"] };
+    const p = { ...defaultUserPolicy(), approvedChains: ["ethereum", "arbitrum"] as WdkChainId[] };
     expect(evaluateUserPolicyForBridge(p, { fromChain: "ethereum", toChain: "arbitrum", amountUsd: 50 }).ok).toBe(
       true,
     );
