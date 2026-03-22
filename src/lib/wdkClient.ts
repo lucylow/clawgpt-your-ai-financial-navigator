@@ -363,7 +363,7 @@ export class ClawWdkBridge {
       detail: {
         asset,
         to: redactRecipient(to),
-        wdkPackage: support.ok ? CHAIN_WALLET_REGISTRY[chain].packageName : support.packageName,
+        wdkPackage: support.ok ? CHAIN_WALLET_REGISTRY[chain].packageName : (support as { packageName: string }).packageName,
         capabilityOk: support.ok,
       },
     });
