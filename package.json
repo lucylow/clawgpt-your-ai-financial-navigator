@@ -8,12 +8,16 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:backend": "npm run dev --prefix backend",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "backend:dev": "npm run dev --prefix backend",
+    "backend:test": "npm test --prefix backend",
+    "backend:build": "npm run build --prefix backend",
     "test:e2e": "playwright test",
     "contracts:compile": "hardhat compile"
   },

@@ -360,6 +360,7 @@ The repository’s declared stack and dependencies show a fairly rich frontend p
 ### Backend / platform
 
 * Supabase JS client
+* Optional **agent wallet API** in `backend/` (Express, Socket.IO, Prisma, `@tetherto/wdk`): from repo root run `npm run dev:backend` after `cd backend && npm i && cp .env.testnet.example .env && npx prisma db push` (see `backend/JUDGES.md`).
 
 ### Testing
 
